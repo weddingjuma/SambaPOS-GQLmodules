@@ -55,12 +55,12 @@ $('#BB_Buttons').on('click', '.BB_Button', function(){
         selectedTaskIDs.push(taskID);
         selectedTaskIdents = [];
         selectedTaskIdents.push(taskIdent);
-        completeKDtasks(selectedTaskIDs,selectedTaskIdents,true,function cKDtsk(){
-            refreshKDtaskList();
+        KD_completeTasks(selectedTaskIDs,selectedTaskIdents,true,function cKDtsk(){
+            KD_refreshTaskList();
         });
     } else {
         if (bbButtonNumber=='Refresh') {
-            refreshKDtaskList();
+            KD_refreshTaskList();
         }
         if (bbButtonNumber=='SelectAll') {
             var belem = document.getElementById('BB_'+bbButtonNumber);
@@ -88,8 +88,8 @@ $('#BB_Buttons').on('click', '.BB_Button', function(){
         }
         if (bbButtonNumber=='MarkCompleted') {
             if (selectedTaskIDs.length > 0) {
-                completeKDtasks(selectedTaskIDs,selectedTaskIdents,true,function cKDtsk(){
-                    refreshKDtaskList();
+                KD_completeTasks(selectedTaskIDs,selectedTaskIdents,true,function cKDtsk(){
+                    KD_refreshTaskList();
                 });
             } else {
                 spu.consoleLog('No Tasks Selected!');

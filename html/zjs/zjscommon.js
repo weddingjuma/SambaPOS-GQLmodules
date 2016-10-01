@@ -4,6 +4,15 @@
 //
 ////////////////////////////////
 function loadMODULE(modscreen) {
+    
+    spu.refreshMoments();
+    
+    if (inSambaPOS) {
+        // if the page is running inside SambaPOS HTML Viewer Widget
+        // get rid of Top and Bottom bars
+        spu.hideHeader();                
+    }
+
     //URLmodule = urlParm["module"];
     //URLmodule = (URLmodule ? URLmodule.toString().toLower() : '');
 
@@ -27,8 +36,7 @@ function loadMODULE(modscreen) {
     if (module != '') {
         spu.consoleLog('Navigation to: '+modscreen);
         
-        spu.consoleLog('Clearing Timers from loadMODULE...');
-        clearTimers();
+        clearTimers('loadMODULE');
         
         var hdrTitle = modscreen.replace(/_/,' ').toUpperCase();
         var hdr = '';
@@ -71,20 +79,18 @@ function loadMODULE(modscreen) {
                         showInfoMessage('Workperiod is CLOSED.<br /><br />Click to Retry.');
                     }
                 });
-                
-
             }
             
             if (modscreen=='kitchen_display') {
 //                KD_HTMLtaskType = 'BB Bump Bar Task HTML';
 //                KD_GUItaskType = 'BB Bump Bar Task';
-                refreshKDtaskList();
+                KD_refreshTaskList();
             }
             if (modscreen=='customer_display') {
-                clearCustomerDisplay();
+                CD_clearDisplay();
             }
             if (modscreen=='timeclock') {
-                refreshTimeclockDisplay(TC_EntityType,TC_EntitySearch);
+                TC_refreshTimeclockDisplay(TC_EntityType,TC_EntitySearch);
                 setReportFilterDefaults();
             }
             if (modscreen=='reports') {
@@ -93,7 +99,7 @@ function loadMODULE(modscreen) {
             }
             if (modscreen=='ticket_explorer') {
                 $('#TE_DisplayTicket').hide();
-                changeTicketExplorerFilters('REP_PeriodPicker');
+                TE_changeTicketExplorerFilters('REP_PeriodPicker');
             }
             if (modscreen=='timeclock_policies') {
                 TSK_TaskTypes = [];
@@ -125,27 +131,10 @@ function loadMODULE(modscreen) {
             // broadcast MODULE to terminals
             sendMODULE(module);
             
-            if (inSambaPOS) {
-                // if the page is running inside SambaPOS HTML Viewer Widget
-                // get rid of Top and Bottom bars
-                $( "#top" ).hide();
-                $( "#containerMODULE" ).css({"padding-top":"0"});
-                $( "#footer" ).hide();
-                $( "#footer" ).css({"margin-top":"0"});
-                // expand main section to full height
-                $( "#containerMain" ).css({"height":"100%"});
-                // reports don't need bottom margin
-                $( "#REP_Report" ).css({"margin-bottom":"0px"});
-                // command buttons can drop down
-                $( "#TC_EntityCommands" ).css({"bottom":"0px"});
-                $( "#TSK_Commands" ).css({"bottom":"0px"});
-                
-            }
-
         });
 
     } else {
-        console.log('!!! ERROR: Navigation is not valid !!! '+modscreen);
+        console.log('!!! ERROR: Module is not valid !!! '+modscreen);
     }
 
 }
@@ -181,50 +170,17 @@ $(document).ready(function(){
     sessionId = session_id();
     currentTerminal = navigator.sayswho;
 
-    getGlobalSetting('BUS_VenueName', function(ret) {
-        var setting = ret;
-        if (!setting.error && setting.value !=='') {
-            venueName = setting.value;
-        }
-    });
-    getGlobalSetting('BUS_MSG_Welcome', function(ret) {
-        var setting = ret;
-        if (!setting.error && setting.value !=='') {
-            welcomeMessage = setting.value;
-        }
-    });
-    getGlobalSetting('BUS_MSG_Open', function(ret) {
-        var setting = ret;
-        if (!setting.error && setting.value !=='') {
-            openMessage = setting.value;
-        }
-    });
-    getGlobalSetting('BUS_MSG_Closed', function(ret) {
-        var setting = ret;
-        if (!setting.error && setting.value !=='') {
-            closedMessage = setting.value;
-        }
-    });
-
     if (inSambaPOS){
-        // these methods are only available if the page is running inside
-        // the SambaPOS HTML Viewer Widget.  They are meant to grab the 
-        // {:CURRENTTERMINAL} and {:CURRENTUSER} from within SambaPOS
-        window.external.ExecuteAutomationCommand('HUB Set Terminal and User','');
-        currentTerminal = window.external.GetLocalSettingValue('currentTerminal');
-        currentUser = window.external.GetLocalSettingValue('currentUser');
-        //alert('T:'+currentTerminal+'\r\nU:'+currentUser);
+        spu.getEmbeddedUserTerminal();
     }
+
+    spu.getBusinessSettings();
 
     $('#module').html('???');
     $('#currentUser').html('['+currentTerminal+'] '+currentUser);
     $('#connection').html(isConnected==true ? '<div class="CON_Indicator CON_Connected"></div>' : '<div class="CON_Indicator CON_Disconnected"></div>');
     
     loadMODULE(module);
-
-//    $('#helpMessage').click(function () {
-//        $('#helpMessage').hide();
-//    });
 
     $('#infoMessage').click(function () {
         $('#infoMessage').hide();
@@ -247,7 +203,7 @@ $(document).ready(function(){
     var proxy = connection.createHubProxy('default');
     proxy.on('update', function(message) {
         //spu.consoleLog('*** MSG RCVD:'+message);
-        var msgparsed = parseHubMessage(message);
+        var msgparsed = HUB_parseMessage(message);
         var containsJSON = (msgparsed.indexOf('{')>-1 && msgparsed.indexOf('}')>-1 ? true :false);
         
         if (!containsJSON) {
@@ -256,7 +212,7 @@ $(document).ready(function(){
         
         if (containsJSON) {
             var jsonData = JSON.parse(msgparsed);
-            var handledHubEvent = handleHubEvent(jsonData);
+            var handledHubEvent = HUB_handleEvent(jsonData);
         }
         
         if (
@@ -273,7 +229,7 @@ $(document).ready(function(){
             jsonObj.eventData = eventData;
             var ev = [];
             ev.push(jsonObj);
-            var handledHubEvent = handleHubEvent(ev);
+            var handledHubEvent = HUB_handleEvent(ev);
         }
 
     }); // proxy.on('update'
@@ -499,10 +455,10 @@ function updateConnectionStatus(connState,opState) {
     
         workperiodCheck('',function wp(){
             if (module=='kitchen_display') {
-                refreshKDtaskList();
+                KD_refreshTaskList();
             }
             if (module=='customer_display') {
-                //clearCustomerDisplay();
+                //CD_clearDisplay();
                 loadMODULE('customer_display');
             }
         });
@@ -511,94 +467,6 @@ function updateConnectionStatus(connState,opState) {
 }
 
 
-function session_id() {
-    return /SESS\w*ID=([^;]+)/i.test(document.cookie) ? RegExp.$1 : false;
-}
-
-function updatePageTitle(modscreen) {
-    var currentTitle = $(document).prop('title');
-    var sepPos = currentTitle.indexOf(' ~ ') + 3;
-    var newTitle = modscreen.replace(/_/,' ').toUpperCase() + ' ~ ' + currentTitle.substr(sepPos,currentTitle.length-sepPos);
-    $(document).prop('title',newTitle);
-}
-
-function getBatteryLevel() {
-    if (isiDevice || navigator.sayswho.indexOf('IE ') > -1) {
-        //
-        $('#battery').html('');
-    } else {
-        navigator.getBattery().then(function(battery) {
-
-            var battLevel = battery.level * 100;
-            $('#battery').html(battLevel+'%');
-
-            return battLevel;
-        });
-    }
-}
-
-function doOnClick(elemID) {
-    $('#'+elemID).click();
-}
-
-function isNumeric(n) {
-  return !isNaN(parseFloat(n)) && isFinite(n);
-}
-function isNumericWithSep(n,sep) {
-    var regex = new RegExp(sep, "g");
-    n = n.replace(regex,'');
-  return !isNaN(parseFloat(n)) && isFinite(n);
-}
-function isPercent(n) {
-  return n.indexOf('%')!==-1 ? true : false;
-}
-function isDate(val) {
-    //var formats = [moment.ISO_8601,"YYYY-MM-DD","YYYY-MM-DD HH:mm","YYYY-MM-DD HH:mm:ss","MM/DD/YYYY","MM/DD/YYYY HH:mm","MM/DD/YYYY HH:mm:ss","DD/MM/YYYY","DD/MM/YYYY HH:mm","DD/MM/YYYY HH:mm:ss"];
-    var formats = dateFormats;
-    return moment(val, formats, true).isValid();
-//    var d = new Date(val);
-//    return !isNaN(d.valueOf());
-}
-function isTime(val) {
-    var isValid = /^([0-1]?[0-9]|2[0-4]):([0-5][0-9])(:[0-5][0-9])?$/.test(val);
-    return isValid;
-}
-function isBoolean(val) {
-    if(typeof(val) === "boolean" || val.toLowerCase()=='true' || val.toLowerCase()=='false'){
-      return true;
-    }
-    return false;
-}
-
-function showInfoMessage(content) {
-    if (document.getElementById('infoMessage')) {
-        document.getElementById('infoMessage').innerHTML = content;
-        document.getElementById('infoMessage').style.display = 'flex';
-    }
-}
-function showHelpMessage(content) {
-    content += '<div class="closeButton" title="click to close" onclick="$(\'#helpMessage\').hide();">X</div>';
-    $('#helpMessage').html(content);
-    $('#helpMessage').show();
-}
-function showErrorMessage(content) {
-    content = content.replace(/\\r\\n/g,'<br />');
-    content += '<div class="closeButton" title="click to close" onclick="$(\'#errorMessage\').hide();">X</div>';
-    $('#errorMessage').html(content);
-    $('#errorMessage').show();
-}
-
-function clearTimers() {
-    // Set a fake timeout to get the highest timeout id
-    var highestIntervalId = setInterval(";");
-    for (var i = 0 ; i <= highestIntervalId ; i++) {
-        clearInterval(i); 
-    }
-    spu.consoleLog('Cleared all timers.  Restarting Clock...');
-    clockTimer = setInterval(showTime, 500);
-    getBatteryLevel();
-    batteryTimer = setInterval(getBatteryLevel, 300000); // poll battery level every 5 minutes
-}
 
 function workperiodCheck(wpid,callback) {
     spu.consoleLog('Checking Workperiod Status...');
@@ -614,435 +482,8 @@ function workperiodCheck(wpid,callback) {
             callback(workperiod);
         }
     });
-//    var msg = '{"eventName":"WORKPERIOD_CHECK"}';
-//    broadcastMessage(msg);
 }
     
-function formatTaskStatus() {
-        var refreshedTaskCards = '';
-        for (var t=1; t<=taskCount; t++) {
-            if (document.getElementById('KD_Task_Status_'+t)) {
-                var taskCard = document.getElementById('KD_Task_Status_'+t);
-                var taskDTstart = taskCard.getAttribute('taskDTstart');
-                var taskDT = taskDTstart.split('T');
-                var taskDateStart = taskDT[0];
-                var taskTimeStart = taskDT[1].substr(0,5);
-                var when = new Date();
-                when = formatDateTime(when);
-                var elapsedMinutes = datediff(taskDTstart,when,'m').toFixed(3);
-                var orderAge = 'new';
-                var orderStatusBGcolor = '#004400';
-                var orderStatusText = 'New Order';
-                var orderStatusColor = '#55FF55';
-                if (elapsedMinutes < 15) {
-                    orderAge = 'new';
-                    orderStatusBGcolor = '#002200';
-                    orderStatusColor = '#55FF55';
-                    orderStatusText = 'New Order ('+Number(elapsedMinutes).toFixed(0)+' min)';
-                }
-                if (elapsedMinutes >= 15 && elapsedMinutes < 25) {
-                    orderAge = 'medium';
-                    orderStatusBGcolor = '#FFDD00';
-                    orderStatusColor = '#000000';
-                    orderStatusText = Number(elapsedMinutes).toFixed(0)+' minutes old';
-                }
-                if (elapsedMinutes >= 25 && elapsedMinutes < 45) {
-                    orderAge = 'old';
-                    orderStatusBGcolor = '#FF0000';
-                    orderStatusColor = '#FFFFFF';
-                    orderStatusText = Number(elapsedMinutes).toFixed(0)+' minutes old';
-                }
-                if (elapsedMinutes >= 45) {
-                    orderAge = 'stale';
-                    orderStatusBGcolor = '#001177';
-                    orderStatusColor = '#55BBFF';
-                    orderStatusText = 'STALE ('+Number(elapsedMinutes).toFixed(0)+' min)';
-                }
-
-                taskCard.style.color = orderStatusColor;
-                taskCard.style.backgroundColor = orderStatusBGcolor;
-                taskCard.innerHTML = ' ['+taskTimeStart+'] '+orderStatusText+' ';
-
-                refreshedTaskCards += t+',';
-            }
-        }
-        if (refreshedTaskCards.length>0) {
-            spu.consoleLog('Refreshed Task Card Statuses:'+refreshedTaskCards.substr(0,refreshedTaskCards.length-1));
-        }
-}
-function updateTaskCards() {
-    var refreshedTaskCards = '';
-    if (taskCount>0) {
-        formatTaskStatus();
-    }
-}
-function taskStatusTimer(op,rate) {
-    if (op=='start') {
-        taskCardTimer = setInterval(updateTaskCards, rate);
-        spu.consoleLog('Started Task Status Updater with refresh rate: '+rate+' ms.');
-    } else {
-        clearInterval(taskCardTimer);
-        spu.consoleLog('Stopped Task Status Updater.');
-    }
-}
-
-function updateTimerDisplay(timerId, startTime) {
-    if (document.getElementById(timerId)) {
-        var t = document.getElementById(timerId);
-        var tstart = t.getAttribute('timeStart');
-            tstart = startTime;
-            
-        var tnow = new Date();
-            tnow = formatDateTime(tnow);
-
-        var tdiff = datediff(tstart,tnow,'s');
-        
-        var h = tdiff/60/60;
-            h = (h<1 ? 0 : h);
-            h = parseInt(h);
-        var m = ( tdiff - (h*60*60) ) / 60;
-            m = (m<1 ? 0 : m);
-            m = parseInt(m);
-        var s = tdiff - (h*60*60) - (m*60);
-            s = parseInt(s);
-        
-        t.innerHTML = (h<10 ? '0'+h : h)+':'+(m<10 ? '0'+m : m)+':'+(s<10 ? '0'+s : s);
-    }
-}
-function entityTimer(timerId, startTime, op, rate) {
-    if (op=='start') {
-        var intervalId = setInterval(function() {
-            updateTimerDisplay(timerId, startTime);
-        }, rate);
-        spu.consoleLog('Started Entity Timer ('+timerId+') with refresh rate: '+rate+' ms.');
-        return intervalId;
-    } else {
-        spu.consoleLog('Clearing Timers from entityTimer...');
-        clearTimers();
-    }
-}
-
-function countTrafficBytes(payload,payloadType,direction,callback) {
-    var pChars = payload;
-    var pBytes = encodeURI(payload).split(/%..|./).length - 1;
-        pBytes = pBytes / 1024;
-    var payLoadPreview = payload.substr(0,70);
-    
-    switch (payloadType) {
-        case 'gql':
-            if (direction == 'sent') {
-                GQLbytesSent += pBytes;
-                GQLbytes += pBytes;
-                spu.consoleLog('>>> GQL Payload (total '+GQLbytes.toFixed(2)+' KB), this message (SENT): '+pChars.length+' chars, '+pBytes.toFixed(2)+' KB' + ' ['+payLoadPreview+']');
-            }
-            if (direction == 'rcvd') {
-                GQLbytesRcvd += pBytes;
-                GQLbytes += pBytes;
-                spu.consoleLog('<<< GQL Payload (total '+GQLbytes.toFixed(2)+' KB), this message (RCVD): '+pChars.length+' chars, '+pBytes.toFixed(2)+' KB' + ' ['+payLoadPreview+']');
-            }
-            break;
-        case 'signalr':
-            signalRbytes += pBytes;
-            spu.consoleLog('<<< SIGNALR Payload (total '+signalRbytes.toFixed(2)+' KB), this message: '+pChars.length+' chars, '+pBytes.toFixed(2)+' KB' + ' ['+payLoadPreview+']');
-            break;
-    }
-
-    $('#signalRbytes').html(signalRbytes.toFixed(2));
-    $('#GQLbytes').html(GQLbytesSent.toFixed(2)+'/'+GQLbytesRcvd.toFixed(2)+'/'+GQLbytes.toFixed(2));
-    
-    if (callback) {
-        callback();
-    }
-}
-
-function clearTrafficBytes(bType){
-    switch (bType) {
-        case 'signalr':
-            signalRbytes = 0;
-            spu.consoleLog('SIGNALR Payload Counter CLEARED');
-            break;
-        case 'gql':
-            GQLbytesSent = 0;
-            GQLbytesRcvd = 0;
-            GQLbytes = GQLbytesSent+GQLbytesRcvd;
-            spu.consoleLog('GQL Payload Counter CLEARED');
-            break;
-        default: // clear all
-            signalRbytes = 0;
-            spu.consoleLog('SIGNALR Payload Counter CLEARED');
-            GQLbytesSent = 0;
-            GQLbytesRcvd = 0;
-            GQLbytes = GQLbytesSent+GQLbytesRcvd;
-            spu.consoleLog('GQL Payload Counter CLEARED');
-            break;
-    }
-
-    $('#signalRbytes').html(signalRbytes.toFixed(2));
-    $('#GQLbytes').html(GQLbytesSent.toFixed(2)+'/'+GQLbytesRcvd.toFixed(2)+'/'+GQLbytes.toFixed(2));
-}
-    
-function parseHubMessage(message) {
-    
-    var msgStart = message.indexOf(':');
-    var msgtoken = message.substr(0,msgStart+1);
-    var msgcontent = message.substr(msgStart+1);
-    
-    countTrafficBytes(msgcontent,'signalr','rcvd');
-    
-    var msgParts = msgcontent.split(">");
-    var msgType = msgParts[0]+">";
-    var msgData  = msgParts[1];
-    
-    msgType = msgType.replace(/</,'');
-    msgType = msgType.replace(/>/,'');
-
-    var containsJSON = (msgData.indexOf('{')>-1 && msgData.indexOf('}')>-1 ? true :false);
-    var msgJson = (containsJSON ? '['+msgData+']' : 'NOJSON');
-
-    if (msgType == 'DELAYED_METHOD_REFRESH') {
-        var removeFirst = msgData.replace(/AC_/,'');
-        var pos = removeFirst.indexOf('_');
-        var msgDataNew = removeFirst.substr(pos+1);
-        //msgData = msgDataNew;
-        return '<<<[ INCOMING ]<<< ' + msgType +'...'+ 'data_removed' +'...'+ 'NOJSON';
-    }
-    
-    
-
-//    var when  = new Date();
-//    when = formatDateTime(when);
-
-    if (containsJSON) {
-        return msgJson;
-    }
-    
-    //return '['+when+' INCOMING] ' + msgEvent +'...'+ msgData +'...'+ msgJson;
-    return '<<<[ INCOMING ]<<< ' + msgType +'...'+ msgData +'...'+ msgJson;
-}
-
-navigator.sayswho= (function(){
-    var ua= navigator.userAgent, tem,
-    M= ua.match(/(opera|chrome|safari|firefox|msie|trident(?=\/))\/?\s*(\d+)/i) || [];
-    if(/trident/i.test(M[1])){
-        tem=  /\brv[ :]+(\d+)/g.exec(ua) || [];
-        return 'IE '+(tem[1] || '');
-    }
-    if(M[1]=== 'Chrome'){
-        tem= ua.match(/\b(OPR|Edge)\/(\d+)/);
-        if(tem!= null) return tem.slice(1).join(' ').replace('OPR', 'Opera');
-    }
-    M= M[2]? [M[1], M[2]]: [navigator.appName, navigator.appVersion, '-?'];
-    if((tem= ua.match(/version\/(\d+)/i))!= null) M.splice(1, 1, tem[1]);
-    return M.join(' ');
-})();
-
-
-function showTime() {
-    var a_p = "";
-    var today = new Date();
-    var curr_hour = today.getHours();
-    var curr_minute = today.getMinutes();
-    var curr_second = today.getSeconds();
-    if (curr_hour < 12) {
-        a_p = "<span>AM</span>";
-    } else {
-        a_p = "<span>PM</span>";
-    }
-    if (curr_hour == 0) {
-        curr_hour = 12;
-    }
-    if (curr_hour > 12) {
-        curr_hour = curr_hour - 12;
-    }
-    curr_hour = checkTime(curr_hour);
-    curr_minute = checkTime(curr_minute);
-    curr_second = checkTime(curr_second);
-    //document.getElementById('clock_time').innerHTML=curr_hour + ":" + curr_minute + ":" + curr_second + " " + a_p;
-    $( '#clock_time' ).html(curr_hour + ":" + curr_minute + ":" + curr_second + " " + a_p);
-
-}
-function checkTime(i) {
-    if (i < 10) {
-        i = "0" + i;
-    }
-    return i;
-}
-
-function getClientGMToffset() {
-  function z(n){return (n<10? '0' : '') + n}
-  var offset = new Date().getTimezoneOffset();
-  var sign = offset < 0? '+' : '-';
-  offset = Math.abs(offset);
-  return sign + z(offset/60 | 0) +':'+ z(offset%60);
-}
-if (!Date.now) {
-    Date.now = function() {
-        return new Date().getTime();
-    };
-}
-function getDateTime(inDate, returnType) {
-    var now = new Date().getTime();
-    
-    var utcMilliSeconds = (inDate ? inDate.getTime() : now);
-    var utcSeconds = Math.round(utcMilliSeconds/1000);
-    var utcMinutes = Math.round(utcMilliSeconds/1000/60);
-    
-    var returnType = (returnType ? returnType.toLowerCase() : 'ms');
-    var ret = '';
-    
-    switch (returnType) {
-        case 'm':
-            ret = utcMinutes;
-            break;
-        case 's':
-            ret = utcSeconds;
-            break;
-        case 'ms':
-            ret = utcMilliSeconds;
-            break;
-        default:
-            ret = utcMilliSeconds;
-            break;
-    }
-    
-    return ret;
-}
-    
-function formatDateTime(when,showMilliseconds,iso) {
-    showMilliseconds = (iso==true ? true : showMilliseconds);
-    
-    yr = when.getFullYear();
-    mo = when.getMonth()+1;
-    mo = (mo<10 ? '0'+mo : mo);
-    dy = when.getDate();
-    dy = (dy<10 ? '0'+dy : dy);
-    hr = when.getHours();
-    hr = (hr<10 ? '0'+hr : hr);
-    mi = when.getMinutes();
-    mi = (mi<10 ? '0'+mi : mi);
-    ss = when.getSeconds();
-    ss = (ss<10 ? '0'+ss : ss);
-    ms = when.getMilliseconds();
-    ms = (ms<10 && ms<100 ? '00'+ms : (ms>9 && ms<100 ? '0'+ms : ms) );
-    
-    when = yr + '-' + mo + '-' + dy;
-    when = when + (iso ? 'T' : ' ');
-    when = when + hr + ':' + mi + ':' + ss;
-    when = when + (showMilliseconds===true ? '.'+ms : '');
-    //when = when + (iso ? 'Z' : '');
-    
-    return when;
-}
-
-function datediff(d1,d2,x) {
-  //var x='s';
-  var diff=0;
-  // 2015-03-01T23:17:45.000
-  // 01234567890123456789012
-  var t1 = new Date(d1.substr(0,4), d1.substr(5,2), d1.substr(8,2), d1.substr(11,2), d1.substr(14,2), d1.substr(17,2), 0);
-  var t2 = new Date(d2.substr(0,4), d2.substr(5,2), d2.substr(8,2), d2.substr(11,2), d2.substr(14,2), d2.substr(17,2), 0);
-  
-  diff = t2.getTime() - t1.getTime();
-  var days  = diff/1000 /60/60 /24; // days
-  var hours = diff/1000 /60/60; // hours
-  var mins  = diff/1000 /60; // minutes
-  var secs  = diff/1000; // seconds
-  var mils  = diff; // milliseconds
-  
-  switch (x) {
-      case 'd':
-          diff = days;
-          break;
-      case 'h':
-          diff = hours;
-          break;
-      case 'm':
-          diff = mins;
-          break;
-      case 's':
-          diff = secs;
-          break;
-      case 'ms':
-          diff = mils;
-          break;
-      default:
-          diff = secs;
-          break;
-  }
-  return diff;
-}
-
-function sleep(milliseconds)
-{
-   var currentTime = new Date().getTime();
-   while (currentTime + milliseconds >= new Date().getTime()) {
-     // do nothing
-   }
-   return milliseconds;
-}
-
-
-
-function logEvent(ev, dur, callback) {
-    var dtNow = new Date().getTime();
-    var found = false;
-    var oCount = eventCounter.length;
-    for (var e=0; e<oCount; e++) {
-        if (eventCounter[e]["eventName"] == ev) {
-            found = true;
-            var evName = eventCounter[e]["eventName"];
-            var evTime = eventCounter[e]["eventTime"];
-            var evCount = eventCounter[e]["eventCount"]+1;
-            var evTimer = eventCounter[e]["eventTimer"];
-            eventCounter[e]["eventCount"] = evCount;
-            break;
-        }
-    }
-    if (!found) {
-        var evName = ev;
-        var evTime = dtNow;
-        var evCount = 1;
-        var pushVal = { }; // new Object()
-        pushVal["eventName"] = evName;
-        pushVal["eventTime"] = evTime;
-        pushVal["eventCount"] = evCount;
-        pushVal["eventTimer"] = 0;
-        eventCounter.push(pushVal);
-    }
-    
-    spu.consoleLog("Logged Event:"+evName+' Count:'+evCount);
-}
-
-function sortJSON(jsonData, prop, asc) {
-    jsonData = jsonData.sort(function(a, b) {
-        if (asc) {
-            return (a[prop] > b[prop]) ? 1 : ((a[prop] < b[prop]) ? -1 : 0);
-        } else {
-            return (b[prop] > a[prop]) ? 1 : ((b[prop] < a[prop]) ? -1 : 0);
-        }
-    });
-    return jsonData;
-    //showResults();
-}
-
-var darkOrLight = function(inColor) {
-  // convert Hex to Int - parseInt(hexString, 16);
-  var red   = parseInt(inColor.substr(0,2), 16);
-  var green = parseInt(inColor.substr(2,2), 16);
-  var blue  = parseInt(inColor.substr(4,2), 16);
-  var brightness;
-  brightness = (red * 299) + (green * 587) + (blue * 114);
-  brightness = brightness / 255000;
-  //spu.consoleLog("IN:"+inColor+" BR:"+brightness);
-  //
-  // values range from 0 to 1
-  // anything greater than 0.5 should be bright enough for dark text
-  if (brightness >= 0.5) {
-    return "dark-text";
-  } else {
-    return "light-text";
-  }
-};
 
 
 function sendMODULE(modscreen) {
@@ -1133,11 +574,11 @@ function getTasks(taskType, startFilter, endFilter, completedFilter, nameLike, c
     //return tasks;
 }
 
-function getTimeclockTasks(taskType,completedFilter,nameLike,contentLike,fieldFilter, state, callback) {
+function TC_getTimeclockTasks(taskType,completedFilter,nameLike,contentLike,fieldFilter, state, callback) {
     var startTime='';
     gql.EXEC(gql.getTasks(taskType,completedFilter,nameLike,contentLike,fieldFilter, state), function(response) {
         if (response.errors) {
-            gql.handleError("getTimeClockTasks", response.errors);
+            gql.handleError("TC_getTimeclockTasks", response.errors);
             callback('ERROR');
         } else {
             TC_Tasks = [];
@@ -1171,7 +612,7 @@ function getTaskEditorTasks(taskType,completedFilter,nameLike,contentLike,fieldF
     return TSK_Tasks;
 }
 
-function completeKDtasks(taskIDs, taskIdents, isCompleted, callback) {
+function KD_completeTasks(taskIDs, taskIdents, isCompleted, callback) {
     spu.consoleLog('Marking KD Tasks Complete...');
     $('#KD_Food').html('<div class="info-message">Completing Tasks, please Wait...<br /><br />'+busyWheel+'</div>');
 
@@ -1212,9 +653,6 @@ function completeKDtasks(taskIDs, taskIdents, isCompleted, callback) {
             }
         }
     });
-
-    //updatedTasks = [];
-    
 }
 function addTasks(taskTypes,taskNames,content,isCompleted,userName,customData,state, confirm, callback) {
     if (confirm !== false) {
@@ -1307,17 +745,124 @@ function postTaskRefreshMessage(taskIDs, callback) {
     gql.EXEC(gql.postTaskRefreshMessage(taskIDs), callback);
 }
 
-function refreshKDtaskList(callback){
+function broadcastMessage(msg) {
+    spu.consoleLog('Broadcasting Message:'+msg);
+    gql.EXEC(gql.postBroadcastMessage(msg), function(response) {
+        if (response.errors) {
+            gql.handleError("broadcastMessage", response.errors);
+        } else {
+            spu.consoleLog('Message Broadcasted:'+response.data.postBroadcastMessage.message);
+        }
+    });
+}
+
+function getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters,callback) {
+    spu.consoleLog('Getting Custom Report ('+reportName+')...');
+    gql.EXEC(gql.getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters), function(response) {
+        if (response.errors) {
+            gql.handleError("getCustomReport", response.errors);
+        } else {
+            var report = response.data.report;
+            spu.consoleLog('getCustomReport:'+reportName+' (tables:'+report.tables.length+')');
+        }
+        if (callback) {
+            callback(report);
+        }
+    });
+    //return report;
+}
+
+function updateEntityState(entityType,entityName,stateName,state,callback) {
+    gql.EXEC(gql.updateEntityState(entityType,entityName,stateName,state), function(response) {
+        if (response.errors) {
+            gql.handleError("updateEntityState", response.errors);
+        } else {
+            var ent = response.data.updateEntityState;
+        }
+        if (callback){
+            callback(ent);
+        }
+    });
+}
+
+function KD_formatTaskStatus() {
+        var refreshedTaskCards = '';
+        for (var t=1; t<=taskCount; t++) {
+            if (document.getElementById('KD_Task_Status_'+t)) {
+                var taskCard = document.getElementById('KD_Task_Status_'+t);
+                var taskDTstart = taskCard.getAttribute('taskDTstart');
+                var taskDT = taskDTstart.split('T');
+                var taskDateStart = taskDT[0];
+                var taskTimeStart = taskDT[1].substr(0,5);
+                var when = new Date();
+                when = formatDateTime(when);
+                var elapsedMinutes = datediff(taskDTstart,when,'m').toFixed(3);
+                var orderAge = 'new';
+                var orderStatusBGcolor = '#004400';
+                var orderStatusText = 'New Order';
+                var orderStatusColor = '#55FF55';
+                if (elapsedMinutes < 15) {
+                    orderAge = 'new';
+                    orderStatusBGcolor = '#002200';
+                    orderStatusColor = '#55FF55';
+                    orderStatusText = 'New Order ('+Number(elapsedMinutes).toFixed(0)+' min)';
+                }
+                if (elapsedMinutes >= 15 && elapsedMinutes < 25) {
+                    orderAge = 'medium';
+                    orderStatusBGcolor = '#FFDD00';
+                    orderStatusColor = '#000000';
+                    orderStatusText = Number(elapsedMinutes).toFixed(0)+' minutes old';
+                }
+                if (elapsedMinutes >= 25 && elapsedMinutes < 45) {
+                    orderAge = 'old';
+                    orderStatusBGcolor = '#FF0000';
+                    orderStatusColor = '#FFFFFF';
+                    orderStatusText = Number(elapsedMinutes).toFixed(0)+' minutes old';
+                }
+                if (elapsedMinutes >= 45) {
+                    orderAge = 'stale';
+                    orderStatusBGcolor = '#001177';
+                    orderStatusColor = '#55BBFF';
+                    orderStatusText = 'STALE ('+Number(elapsedMinutes).toFixed(0)+' min)';
+                }
+
+                taskCard.style.color = orderStatusColor;
+                taskCard.style.backgroundColor = orderStatusBGcolor;
+                taskCard.innerHTML = ' ['+taskTimeStart+'] '+orderStatusText+' ';
+
+                refreshedTaskCards += t+',';
+            }
+        }
+        if (refreshedTaskCards.length>0) {
+            spu.consoleLog('Refreshed Task Card Statuses:'+refreshedTaskCards.substr(0,refreshedTaskCards.length-1));
+        }
+}
+function KD_updateTaskCards() {
+    var refreshedTaskCards = '';
+    if (taskCount>0) {
+        KD_formatTaskStatus();
+    }
+}
+function KD_taskStatusTimer(op,rate) {
+    if (op=='start') {
+        taskCardTimer = setInterval(KD_updateTaskCards, rate);
+        spu.consoleLog('Started Task Status Updater with refresh rate: '+rate+' ms.');
+    } else {
+        clearInterval(taskCardTimer);
+        spu.consoleLog('Stopped Task Status Updater.');
+    }
+}
+function KD_refreshTaskList(callback){
     $('#KD_Food').html('<div class="info-message">Fetching Tasks, please Wait...<br /><br />'+busyWheel+'</div>');
 
     gql.EXEC(gql.getTasks(KD_HTMLtaskType,'false'), function(response) {
         if (response.errors) {
-            gql.handleError("refreshKDtaskList", response.errors);
+            gql.handleError("KD_refreshTaskList", response.errors);
         } else {
             taskCount = 0;
 
             if (taskCount < 1) {
-                taskStatusTimer('stop');
+                KD_taskStatusTimer('stop');
             }
 
             taskCount = response.data.tasks.length;
@@ -1326,8 +871,6 @@ function refreshKDtaskList(callback){
             
             var cardsPerRow = 4;
             var cardCount = 0;
-            
-            //$("#KD_Food").empty();
             
             var stuff = '';
 
@@ -1365,8 +908,8 @@ function refreshKDtaskList(callback){
             $('#KD_Food').append(stuff);
 
             if (taskCount > 0) {
-                formatTaskStatus();
-                taskStatusTimer('start',30000);
+                KD_formatTaskStatus();
+                KD_taskStatusTimer('start',30000);
             }
 
             spu.consoleLog("Refreshed KD Tasks!");
@@ -1377,9 +920,9 @@ function refreshKDtaskList(callback){
         }
     });
 }
-//var refreshKDtaskList_debounced = spu.debounce(refreshKDtaskList,2500);
-//var refreshKDtaskList_debounced = spu.debounce(refreshKDtaskList,1000);
-var refreshKDtaskList_debounced = spu.debounce(refreshKDtaskList,1000);
+//var KD_refreshTaskList_debounced = spu.debounce(KD_refreshTaskList,2500);
+//var KD_refreshTaskList_debounced = spu.debounce(KD_refreshTaskList,1000);
+var KD_refreshTaskList_debounced = spu.debounce(KD_refreshTaskList,1000);
 
 function calculateTaskDuration() {
     var start = document.getElementById('taskStart').value;
@@ -1395,18 +938,41 @@ function calculateTaskDuration() {
     return out;
 }
 
-function broadcastMessage(msg) {
-    spu.consoleLog('Broadcasting Message:'+msg);
-    gql.EXEC(gql.postBroadcastMessage(msg), function(response) {
-        if (response.errors) {
-            gql.handleError("broadcastMessage", response.errors);
-        } else {
-            spu.consoleLog('Message Broadcasted:'+response.data.postBroadcastMessage.message);
-        }
-    });
+function HUB_parseMessage(message) {
+    
+    var msgStart = message.indexOf(':');
+    var msgtoken = message.substr(0,msgStart+1);
+    var msgcontent = message.substr(msgStart+1);
+    
+    countTrafficBytes(msgcontent,'signalr','rcvd');
+    
+    var msgParts = msgcontent.split(">");
+    var msgType = msgParts[0]+">";
+    var msgData  = msgParts[1];
+    
+    msgType = msgType.replace(/</,'');
+    msgType = msgType.replace(/>/,'');
+
+    var containsJSON = (msgData.indexOf('{')>-1 && msgData.indexOf('}')>-1 ? true :false);
+    var msgJson = (containsJSON ? '['+msgData+']' : 'NOJSON');
+
+    if (msgType == 'DELAYED_METHOD_REFRESH') {
+        var removeFirst = msgData.replace(/AC_/,'');
+        var pos = removeFirst.indexOf('_');
+        var msgDataNew = removeFirst.substr(pos+1);
+        //msgData = msgDataNew;
+        return '<<<[ INCOMING ]<<< ' + msgType +'...'+ 'data_removed' +'...'+ 'NOJSON';
+    }
+
+    if (containsJSON) {
+        return msgJson;
+    }
+    
+    //return '['+when+' INCOMING] ' + msgEvent +'...'+ msgData +'...'+ msgJson;
+    return '<<<[ INCOMING ]<<< ' + msgType +'...'+ msgData +'...'+ msgJson;
 }
 
-function handleHubEvent(ev) {
+function HUB_handleEvent(ev) {
     var evContent  = ev[0];
     if (ev[0]['eventName']) {
         var eventName = ev[0]['eventName'];
@@ -1475,29 +1041,29 @@ function handleHubEvent(ev) {
     switch (eventName) {
         case 'TICKET_DISPLAYED':
             if (module=='customer_display') {
-                updateCustomerDisplay(ticketData);
+                CD_updateDisplay(ticketData);
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
             }
             break;
         case 'CLOSE_TICKET_NOW':
             if (module=='customer_display') {
-                clearCustomerDisplay();
+                CD_clearDisplay();
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
             }
             break;
         case 'CLOSE_TICKET_DELAYED':
             if (module=='customer_display') {
-                spu.consoleLog(eventName+'> '+'Calling: clearCustomerDisplay_delayed ...');
-                clearCustomerDisplay_delayed();
+                spu.consoleLog(eventName+'> '+'Calling: CD_clearDisplay_delayed ...');
+                CD_clearDisplay_delayed();
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
             }
             break;
         case 'PAYMENT_PROCESSED':
             if (module=='customer_display') {
-                updateCustomerDisplay(ticketData);
+                CD_updateDisplay(ticketData);
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
             }
@@ -1505,32 +1071,32 @@ function handleHubEvent(ev) {
         case 'TASK_COMPLETED':
         case 'TASK_PRINTED':
             if (module=='kitchen_display') {
-                spu.consoleLog(eventName+'> '+'Calling: refreshKDtaskList_debounced ...');
-                refreshKDtaskList_debounced();
+                spu.consoleLog(eventName+'> '+'Calling: KD_refreshTaskList_debounced ...');
+                KD_refreshTaskList_debounced();
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
             }
             break;
         case 'TASKS_COMPLETED_HTML':
             if (module=='kitchen_display' && sid!='' && sid!=sessionId) {
-                spu.consoleLog(eventName+'> '+'Calling: refreshKDtaskList_debounced ...');
-                refreshKDtaskList_debounced();
+                spu.consoleLog(eventName+'> '+'Calling: KD_refreshTaskList_debounced ...');
+                KD_refreshTaskList_debounced();
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
             }
             break;
         case 'TASK_REFRESH':
             if (module=='kitchen_display') {
-                spu.consoleLog(eventName+'> '+'Calling: refreshKDtaskList_debounced ...');
-                refreshKDtaskList_debounced();
+                spu.consoleLog(eventName+'> '+'Calling: KD_refreshTaskList_debounced ...');
+                KD_refreshTaskList_debounced();
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
             }
             break;
         case 'TIMECLOCK_REFRESH':
             if (module=='timeclock' && sid!='' && sid!=sessionId) {
-                spu.consoleLog(eventName+'> '+'Calling: refreshTimeclockDisplay ...');
-                refreshTimeclockDisplay(TC_EntityType,TC_EntitySearch);
+                spu.consoleLog(eventName+'> '+'Calling: TC_refreshTimeclockDisplay ...');
+                TC_refreshTimeclockDisplay(TC_EntityType,TC_EntitySearch);
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
             }
@@ -1550,7 +1116,7 @@ function handleHubEvent(ev) {
                     spu.consoleLog(eventName+'> '+'Workperiod is CLOSED ('+workperiod.id+').');
                 }
                 if (module=='customer_display') {
-//                    clearCustomerDisplay(function gct(){
+//                    CD_clearDisplay(function gct(){
                         loadMODULE('customer_display');
 //                    });
                 }
@@ -1698,7 +1264,7 @@ function chatShowFull(hideShow) {
 
 
 
-function clearCustomerDisplay() {
+function CD_clearDisplay() {
     spu.consoleLog('Clearing Customer Display...');
     $("#CD_orders").empty();
     $('#CD_ticketTotalValue').empty();
@@ -1719,9 +1285,9 @@ function clearCustomerDisplay() {
     $('#CD_idle').html(idlestuff);
     $('#CD_idle').show();
 }
-var clearCustomerDisplay_delayed = spu.debounce(clearCustomerDisplay,15000);
+var CD_clearDisplay_delayed = spu.debounce(CD_clearDisplay,15000);
 
-function updateCustomerDisplay(ticketData) {
+function CD_updateDisplay(ticketData) {
     spu.consoleLog('Updating Customer Display...');
 
     var timeOffset = getClientGMToffset().split(':');
@@ -1882,23 +1448,7 @@ function updateCustomerDisplay(ticketData) {
     }
 }
 
-function getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters,callback) {
-    spu.consoleLog('Getting Custom Report ('+reportName+')...');
-    gql.EXEC(gql.getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters), function(response) {
-        if (response.errors) {
-            gql.handleError("getCustomReport", response.errors);
-        } else {
-            var report = response.data.report;
-            spu.consoleLog('getCustomReport:'+reportName+' (tables:'+report.tables.length+')');
-        }
-        if (callback) {
-            callback(report);
-        }
-    });
-    //return report;
-}
-
-function refreshEmployeeEntities(entityType, search, stateFilter, tasks, callback){
+function TC_refreshEmployeeEntities(entityType, search, stateFilter, tasks, callback){
     // singular name of entityType
     var eType = entityType.substr(0,entityType.length-1);
     
@@ -1906,9 +1456,9 @@ function refreshEmployeeEntities(entityType, search, stateFilter, tasks, callbac
     
     gql.EXEC(gql.getEntities(entityType, search, stateFilter), function(response) {
         if (response.errors) {
-            gql.handleError("refreshEmployeeEntities", response.errors);
+            gql.handleError("TC_refreshEmployeeEntities", response.errors);
         } else {
-            spu.consoleLog('refreshEmployeeEntities:'+entityType+' ('+response.data.entities.length+')');
+            spu.consoleLog('TC_refreshEmployeeEntities:'+entityType+' ('+response.data.entities.length+')');
             
             var entities = response.data.entities;
 
@@ -2026,12 +1576,47 @@ function refreshEmployeeEntities(entityType, search, stateFilter, tasks, callbac
     return TC_Entities;
 }
 
-function updateEmployeeTimers(employees, tasks, callback) {
+function TC_updateTimerDisplay(timerId, startTime) {
+    if (document.getElementById(timerId)) {
+        var t = document.getElementById(timerId);
+        var tstart = t.getAttribute('timeStart');
+            tstart = startTime;
+            
+        var tnow = new Date();
+            tnow = formatDateTime(tnow);
+
+        var tdiff = datediff(tstart,tnow,'s');
+        
+        var h = tdiff/60/60;
+            h = (h<1 ? 0 : h);
+            h = parseInt(h);
+        var m = ( tdiff - (h*60*60) ) / 60;
+            m = (m<1 ? 0 : m);
+            m = parseInt(m);
+        var s = tdiff - (h*60*60) - (m*60);
+            s = parseInt(s);
+        
+        t.innerHTML = (h<10 ? '0'+h : h)+':'+(m<10 ? '0'+m : m)+':'+(s<10 ? '0'+s : s);
+    }
+}
+function TC_entityTimer(timerId, startTime, op, rate) {
+    if (op=='start') {
+        var intervalId = setInterval(function() {
+            TC_updateTimerDisplay(timerId, startTime);
+        }, rate);
+        spu.consoleLog('Started Entity Timer ('+timerId+') with refresh rate: '+rate+' ms.');
+        return intervalId;
+    } else {
+        clearTimers('TC_entityTimer');
+    }
+}
+
+function TC_updateEmployeeTimers(employees, tasks, callback) {
     spu.consoleLog('Updating Timeclock Timers ('+employees.length+')');
     spu.consoleLog('Timeclock Entities: '+employees.length);
     spu.consoleLog('Timeclock Tasks: '+tasks.length);
     
-    entityTimer('','', 'stop');
+    TC_entityTimer('','', 'stop');
     
     var GMToffset = getClientGMToffset();
     
@@ -2085,7 +1670,7 @@ function updateEmployeeTimers(employees, tasks, callback) {
                 }
                 if (entity.punchState == 'Punched In') {
                     spu.consoleLog('Starting Entity Timer for: '+taskEntityName);
-                    entityTimer(entity.entTimerId, timeStart, 'start', 1000);
+                    TC_entityTimer(entity.entTimerId, timeStart, 'start', 1000);
                 } else {
                     spu.consoleLog('No need to start Entity Timer for: '+taskEntityName);
                 }
@@ -2101,14 +1686,14 @@ function updateEmployeeTimers(employees, tasks, callback) {
     }
 }
 
-function refreshTimeclockDisplay(entityType,search,callback) {
+function TC_refreshTimeclockDisplay(entityType,search,callback) {
     spu.consoleLog("Refreshing Timeclock Display ...");
     $('#TC_Entities').html('<div class="info-message">Fetching Entities, please Wait...<br /><br />'+busyWheel+'</div>');
-    getTimeclockTasks(TC_PunchTaskType,'false','','','',''
+    TC_getTimeclockTasks(TC_PunchTaskType,'false','','','',''
         , function tcTasks() {
-            refreshEmployeeEntities(entityType, search, '', TC_Tasks
+            TC_refreshEmployeeEntities(entityType, search, '', TC_Tasks
             , function empTimers() {
-                updateEmployeeTimers(TC_Entities,TC_Tasks
+                TC_updateEmployeeTimers(TC_Entities,TC_Tasks
                 , function et(){
                     $('#REP_Report').empty();
                     if (callback) {
@@ -2456,7 +2041,7 @@ function displayReport(report) {
     }
 }
 
-function changeTicketExplorerFilters(parm, callback) {
+function TE_changeTicketExplorerFilters(parm, callback) {
 
     $('#TE_DisplayTicket').hide();
 
@@ -2525,14 +2110,14 @@ function changeTicketExplorerFilters(parm, callback) {
     //}
 
     $('#TE_Tickets').html('<div class="info-message">Fetching Tickets, please Wait...<br /><br />'+busyWheel+'</div>');
-    getTicketExplorerTickets(startDate,endDate,isClosed,orderBy,'' ,''  , function gt(tickets){
+    TE_getTicketExplorerTickets(startDate,endDate,isClosed,orderBy,'' ,''  , function gt(tickets){
         TE_Tickets = tickets;
-        refreshTicketExplorerTicketList(TE_Tickets);
+        TE_refreshTicketExplorerTicketList(TE_Tickets);
     });
 
 }
 
-function getTicketExplorerTickets(startDate,endDate,isClosed,orderBy,take,skip, callback) {
+function TE_getTicketExplorerTickets(startDate,endDate,isClosed,orderBy,take,skip, callback) {
 
     if (startDate=='') {
         startDate = $('#REP_DateStart').val();
@@ -2552,7 +2137,7 @@ function getTicketExplorerTickets(startDate,endDate,isClosed,orderBy,take,skip, 
     
     gql.EXEC(gql.getTickets(startDate,endDate,isClosed,orderBy,take,skip), function(response) {
         if (response.errors) {
-            gql.handleError("getTicketExplorerTickets", response.errors);
+            gql.handleError("TE_getTicketExplorerTickets", response.errors);
             if (callback) {
                 callback('ERROR');
             }
@@ -2567,7 +2152,7 @@ function getTicketExplorerTickets(startDate,endDate,isClosed,orderBy,take,skip, 
     });
 }
 
-function refreshTicketExplorerTicketList(tickets, callback) {
+function TE_refreshTicketExplorerTicketList(tickets, callback) {
 
     $('#TE_Ticket').empty();
     $('#TE_Tickets').empty();
@@ -2631,7 +2216,7 @@ function refreshTicketExplorerTicketList(tickets, callback) {
         callback(tickets);
     }
 }
-function displayTicketExplorerTicket(ticketUid) {
+function TE_displayTicketExplorerTicket(ticketUid) {
 
     $('#TE_DisplayTicket').hide();
 
@@ -2772,357 +2357,10 @@ function displayTicketExplorerTicket(ticketUid) {
         
     }
 }
-function displayTicketExplorerTicketinSambaPOS() {
+function TE_displayTicketExplorerTicketinSambaPOS() {
     if (inSambaPOS) {
         var name = 'HUB Display Ticket in SambaPOS';
         var value = $('#TicketExplorerTicket').attr('ticketId');
-        execCMD(name,value);
+        spu.executeAutomationCommand(name,value);
     }
-}
-
-
-
-
-
-
-
-function updateEntityState(entityType,entityName,stateName,state,callback) {
-    gql.EXEC(gql.updateEntityState(entityType,entityName,stateName,state), function(response) {
-        if (response.errors) {
-            gql.handleError("updateEntityState", response.errors);
-        } else {
-            var ent = response.data.updateEntityState;
-        }
-        if (callback){
-            callback(ent);
-        }
-    });
-}
-
-function createTicket(orders,ticketTable,ticketCustomer,callback){
-    //var ticketID = 0;
-    gql.EXEC(gql.addTicket(orders,ticketTable,ticketCustomer), function(response) {
-        if (response.errors) {
-            gql.handleError("createTicket", response.errors);
-        } else {
-            var ticketID = response.data.addTicket.id;
-            if (document.getElementById('Customers_'+ticketCustomer)) {
-                document.getElementById('Customers_'+ticketCustomer).style.backgroundColor = '';
-                var tids = document.getElementById('Customers_'+ticketCustomer).getAttribute("ticketIDs");
-                tids = (tids.length>0 ? tids+','+ticketID : ticketID);
-                document.getElementById('Customers_'+ticketCustomer).setAttribute("ticketIDs",tids);
-                document.getElementById('Customers_'+ticketCustomer).setAttribute("statusState",'New Orders');
-                document.getElementById('Customers_'+ticketCustomer).setAttribute("class",'entityBtn statusState_New_Orders');
-            }
-            if (document.getElementById('Tables_'+ticketTable)) {
-                document.getElementById('Tables_'+ticketTable).style.backgroundColor = '';
-                var tids = document.getElementById('Tables_'+ticketTable).getAttribute("ticketIDs");
-                tids = (tids.length>0 ? tids+','+ticketID : ticketID);
-                document.getElementById('Tables_'+ticketTable).setAttribute("ticketIDs",tids);
-                document.getElementById('Tables_'+ticketTable).setAttribute("statusState",'New Orders');
-                document.getElementById('Tables_'+ticketTable).setAttribute("class",'entityBtn statusState_New_Orders');
-            }
-            refreshTicket();
-            if (document.getElementById('selectCustomers')) {
-                document.getElementById('selectCustomers').innerHTML = "Customer";
-            }
-            if (document.getElementById('selectTables')) {
-                document.getElementById('selectTables').innerHTML = "Table";
-            }
-           ticketTable = '';
-           ticketCustomer = '';
-           spu.consoleLog('Created Ticket:'+ticketID);
-           return callback(ticketID);
-        }
-    });
-}
-
-function updateEntityColor(entityType,entityName){
-    if(!entityName) return;
-    gql.EXEC(gql.updateEntityState(entityType,entityName,'Status','New Orders'), function(response) {
-        if (response.errors) {
-            gql.handleError("updateEntityColor", response.errors);
-        } else {
-            if (document.getElementById('Customers_'+entityName)) {
-                var ent = document.getElementById('Customers_'+entityName);
-                ent.style.backgroundColor = 'Orange';
-            }
-            if (document.getElementById('Tables_'+entityName)) {
-                var ent = document.getElementById('Tables_'+entityName);
-                ent.style.backgroundColor = 'Orange';
-            }
-        }
-    });
-}
-
-function refreshTicket(){
-    gql.EXEC(gql.postTicketRefreshMessage('0'));
-}
-
-function updateCategories(){
-    categoryIDs = [];
-    gql.EXEC(gql.getMenuCategories(), function(response) {
-        if (response.errors) {
-            gql.handleError("updateCategories", response.errors);
-        } else {
-            var menuCategories = response.data.menuCategories;
-            spu.consoleLog('updateCategories ('+menuCategories.length+')');
-
-            var fastStuff = '';
-            var catStuff = '';
-            var firstNonFastCat = -1;
-            
-            for (var c=0; c<menuCategories.length; c++) {
-                var category = menuCategories[c];
-                var catId = category.id;
-                categoryIDs.push(catId);
-
-                firstNonFastCat = (category.isFastMenu==false && firstNonFastCat<0 ? c : firstNonFastCat);
-                firstNonFastCat = Number(firstNonFastCat);
-                
-                var catName = category.name.toString().replace(/\\r/g, " ");
-
-                var catHeader = '';
-                if (category.header!=null) {
-                    catHeader = category.header.toString().replace(/\\r/g, "<br />");
-                    catHeader = catHeader.replace(/<br>/g, "<br />");
-                }
-
-                var catButtonText = (catHeader!='' ? catHeader : catName);
-
-                var bgColor = '';
-                if (category.color!=null) {
-                    bgColor = category.color;
-                } else {
-                    bgColor = '#FF333333';
-                }
-                if (bgColor.indexOf("#")==0) {
-                    bgColor = bgColor.substr(3,6);
-                    var DL = darkOrLight(bgColor);
-                    bgColor = "#" + bgColor;
-                    var tColor = (DL=="light-text" ? "#FFFFFF" : "#000000");
-                }
-                //if (c==0) {
-                if (c==firstNonFastCat) {
-                    var categoryBGcolor = bgColor;
-                }
-                
-                if (category.isFastMenu) {
-                    //fastStuff += '<div class="catRow"><div id="c_'+catId+'" name="'+catName+'" value="'+catName+'" isFastMenu="'+menuCategories.isFastMenu+'" bgColor="'+bgColor+'" style="background-color:'+bgColor+';color:'+tColor+';" class="cBtn">';
-                    updateMenuItems(menuCategories[c].name, bgColor, 1);
-                    //fastStuff += '</div></div>';
-                } else {
-                    catStuff += '<div class="catRow"><div id="c_'+catId+'" name="'+catName+'" value="'+catName+'" isFastMenu="0" bgColor="'+bgColor+'" style="background-color:'+bgColor+';color:'+tColor+';" class="cBtn">';
-                    catStuff += catButtonText;
-                    catStuff += '</div>';
-                    catStuff += '<div id="cm_'+catId+'" class="cBtnMarker">&nbsp;</div>';
-                    catStuff += '</div>';
-                }
-            }
-
-            $('#categories').empty();
-            $('#categories').append(catStuff);
-            //$('#menuFast').empty();
-            //$('#menuFast').append(fastStuff);
-
-            selectedCategoryId = 'c_'+menuCategories[firstNonFastCat].id;
-
-            //updateMenuItems(menuCategories[0].name, categoryBGcolor, menuCategories[0].isFastMenu);
-            //updateMenuItems(menuCategories[firstNonFastCat].name, categoryBGcolor, menuCategories[firstNonFastCat].isFastMenu);
-            document.getElementById('c_'+menuCategories[firstNonFastCat].id).click();
-        }
-    });
-}
-
-function updateMenuItems(category, categoryBGcolor, categoryIsFastMenu){
-    itemIDs = [];
-    category = category.toString().replace(/\\r/g, " ");
-    category = category.toString().replace(/&amp;/g, "&");
-    categoryBGcolor = (typeof categoryBGcolor == 'undefined' ? '' : categoryBGcolor);
-    
-    var menuItemColumnCount = 5;
-
-    gql.EXEC(gql.getMenuItems(category), function(response) {
-        if (response.errors) {
-            gql.handleError("updateMenuItems", response.errors);
-        } else {                      
-            spu.consoleLog('updateMenuItems:'+category+' ('+response.data.items.length+')');
-
-            $('#menuItems').empty();
-
-            for (var i=0; i<response.data.items.length; i++) {
-                var item = response.data.items[i];
-                var isFastMenu = categoryIsFastMenu;
-                itemIDs.push(item.id);
-                item.name = item.name.toString().replace(/\\r/g, " ");
-                if (item.header!=null) {
-                    item.header = item.header.toString().replace(/\\r/g, "<br />");
-                    item.header = item.header.toString().replace(/<br>/g, "<br />");
-                }
-
-                if (item.color!=null) {
-                    bgColor = item.color;
-                } else {
-                    if (categoryBGcolor!='') {
-                        bgColor = categoryBGcolor;
-                    } else {
-                        bgColor = '#FF333333';
-                    }
-                }
-                if (bgColor.indexOf("#")==0) {
-                    if (bgColor.length>7) {
-                        bgColor = bgColor.substr(3,6);
-                    } else {
-                        bgColor = bgColor.substr(1,6);
-                    }
-                    DL = darkOrLight(bgColor);
-                    bgColor = "#" + bgColor;
-                    tColor = (DL=="light-text" ? "#FFFFFF" : "#000000");
-                }
-
-                var itemButtonText = (item.header ? item.header : item.name);
-                if (isFastMenu==1) {
-                    $('#menuFast').append('<div class="menuItem"><div id="m_'+item.id+'" name="'+item.name+'" value="'+item.name+'" class="mBtn" style="background:'+bgColor+';color:'+tColor+';height:70px;" price="'+item.product.price+'">'+itemButtonText+'</div></div>');
-                } else {
-                    $('#menuItems').append('<div class="menuItem"><div id="m_'+item.id+'" name="'+item.name+'" value="'+item.name+'" class="mBtn" style="background:'+bgColor+';color:'+tColor+';" price="'+item.product.price+'">'+itemButtonText+'</div></div>');
-                }
-            }
-            //});
-
-            if (isFastMenu!=1) {
-                var allElements = $('.menuItem'),
-                WRAP_BY = menuItemColumnCount;
-                for (var i = 0; i < allElements.length; i += WRAP_BY) {
-                    //first loop, elements 0 : 15, next loop elements 15:30 and so on
-                    allElements.slice(i, i + WRAP_BY).wrapAll('<div class="menuItemButtonRow" />');
-                }
-            }
-            
-        }
-    });
-}
-
-function updateTicketOrders(){
-    var ttl=0.00;
-    $('#orders').empty();
-    for (var o=0; o<orders.length; o++) {
-        var order = orders[o];
-        var orderId = order.id;
-        var price = Number(order.price).toFixed(2);
-        var orderLineTotal = Number(order.quantity * price).toFixed(2);
-        var oStates = order.states;
-        var stuff = '';
-        stuff += '<div id="o_'+orderId+'_'+o+'" class="orderContainer" product="'+order.name+'" quantity="'+order.quantity+'" price="'+price+'" orderLineTotal="'+orderLineTotal+'" isSelected="0">';
-            stuff += '<div class="orderLine">';
-            stuff += '    <div class="orderQuantity">'+order.quantity+'</div>';
-            stuff += '    <div class="orderName">'+order.name+'</div>';
-            //stuff += '    <div class="orderPrice">'+price+'</div>';
-            stuff += '    <div class="orderPrice">'+orderLineTotal+'</div>';
-            stuff += '</div>';
-            stuff += '<div class="orderState">';
-                var os = '';
-                for (var s=0; s<oStates.length; s++) {
-                    //os += oStates[s]["stateName"]+':'+oStates[s]["state"];
-                    os += oStates[s]["state"];
-                    os += (s<(oStates.length-1) ? ',' : '');
-                }
-                //os = os.substr(0,os.length-1); // trim trailing comma
-                stuff += os;
-            stuff += '</div>';
-        stuff += '</div>';
-        
-        $('#orders').append(stuff);
-        
-        ttl += Number(order.price);
-    }
-    
-    ttl = ttl.toFixed(2);
-    $('#ticketTotalValue').html(ttl);
-    
-    return 'o_'+orderId+'_'+o;
-}
-
-function updateEntities(entityType, callback){
-    gql.EXEC(gql.getEntities(entityType), function(response) {
-        if (response.errors) {
-            gql.handleError("updateEntities", response.errors);
-        } else {
-            spu.consoleLog('updateEntities:'+entityType+' ('+response.data.entities.length+')');
-            // singular name of entityType
-            var eType = entityType.substr(0,entityType.length-1);
-            var ticketEntity = '';
-            if (entityType=="Customers") {
-                ticketEntity = ticketCustomer;
-            }
-            if (entityType=="Tables") {
-                ticketEntity = ticketTable;
-            }
-            
-            $('#'+entityType).empty();
-            $('#'+entityType).append('<div id="'+entityType+'_BACK" name="BACK" entityType="'+entityType+'" state="" class="entityBtn" style="background-color:#000088;font-size:50px;">[ &lt; ]</div>');
-            $('#'+entityType).append('<div id="'+entityType+'_NONE" name="NONE" entityType="'+entityType+'" state="" class="entityBtn" style="background-color:#880000;font-size:50px;">[ X ]</div>');
-
-            jsonData = response.data.entities;
-            jsonData = sortJSON(jsonData,"name",true);
-
-            for (var e=0; e<response.data.entities.length; e++) {
-                var entity = response.data.entities[e];
-
-                for (var s=0; s<entity.states.length; s++) {
-                    var ST = entity.states[s];
-                    if (ST.stateName=="Status") {
-                        entity.statusState = ST.state;
-                        entity.statusStateClass = ST.state.replace(/ /g,'_');
-                        //spu.consoleLog(entity.type+":"+entity.name+" Status State:"+ST.state+entity.statusState);
-                    }
-                }
-
-                var bgc='';
-                if (orders.length>0 && ticketEntity==entity.name) {
-                    bgc=' style="background-color:#660066"';
-                    if (document.getElementById('select'+entityType)) {
-                        document.getElementById('select'+entityType).innerHTML = eType+"<br /><b style='color:#55FF55'>"+ticketEntity+"</b>";
-                    }
-                }
-
-                $('#'+entityType).append('<div id="'+entityType+'_'+entity.name+'" name="'+entity.name+'" entityType="'+entityType+'" statusState="'+entity.statusState+'" ticketIDs="" class="entityBtn statusState_'+entity.statusStateClass+'"'+bgc+'>'+entity.name+'</div>');
-            }
-
-
-        }
-    });
-
-}
-
-function amcButtons(mapping) {
-    switch (mapping) {
-        case 'ticketCommands':
-            var amcButtons = amcBtns_ticketCommands;
-            break;
-        case 'orderCommands':
-            var amcButtons = amcBtns_orderCommands;
-            break;
-        case 'ticketRow1':
-            var amcButtons = amcBtns_ticketRow1;
-            break;
-        case 'ticketRow2':
-            var amcButtons = amcBtns_ticketRow2;
-            break;
-        default:
-            break;
-    }
-    
-    $('#'+mapping).empty();
-    for (var b=0; b<amcButtons.length; b++) {
-        var btn = amcButtons[b];
-        var btnStuff = '<div id="amc_'+btn["buttonID"]+'" name="'+btn["buttonName"]+'" class="buttonMain" style="background-color:'+btn["btnBGcolor"]+';color:'+btn["btnTextColor"]+'">'+btn["buttonHeader"]+'</div>';
-        $('#'+mapping).append(btnStuff);
-    }
-}
-
-
-
-function execCMD(name,value) {
-    // WebTest
-    window.external.ExecuteAutomationCommand(name,value);
 }

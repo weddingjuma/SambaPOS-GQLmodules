@@ -103,6 +103,7 @@ var yy = date.getYear();
 var year = (yy < 1000) ? yy + 1900 : yy;
 
 var clockTimer;
+var batteryTimer;
 
 // Keyboard
 var KEYCODES = [];

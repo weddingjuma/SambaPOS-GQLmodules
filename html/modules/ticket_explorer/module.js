@@ -39,7 +39,7 @@ $('#TE_Tickets').on('click', '.TE_TicketPreview', function(){
             }
             spu.consoleLog('Selected TE Ticket: '+btnName);
             
-            displayTicketExplorerTicket(btnName);
+            TE_displayTicketExplorerTicket(btnName);
             jumpTop();
 
         } else {
