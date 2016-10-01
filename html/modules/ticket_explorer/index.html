@@ -7,7 +7,7 @@
                     <div id="REP_DateFilters">
                         <div style="margin:2px;">
                             <span style="color:#DDDDDD;line-height:2;">Period:</span><br />
-                            <SELECT id="REP_PeriodPicker" onchange="changeTicketExplorerFilters(this.id);" style="font-size:24px;">
+                            <SELECT id="REP_PeriodPicker" onchange="TE_changeTicketExplorerFilters(this.id);" style="font-size:24px;">
                             <OPTION VALUE="Today">Today</OPTION>
                             <OPTION VALUE="Yesterday">Yesterday</OPTION>
                             <OPTION VALUE="This Week">This Week</OPTION>
@@ -26,12 +26,12 @@
                         
                     </div>
                     <div id="TE_Parameters" style="text-align:left;margin:2px;margin-bottom:10px;">
-                        <SELECT id="TE_OpenClosed" onchange="changeTicketExplorerFilters(this.id);" style="font-size:24px;">
+                        <SELECT id="TE_OpenClosed" onchange="TE_changeTicketExplorerFilters(this.id);" style="font-size:24px;">
                         <OPTION VALUE="false">Open Tickets</OPTION>
                         <OPTION VALUE="true">Closed Tickets</OPTION>
                         <OPTION VALUE="">-</OPTION>
                         </SELECT>
-                        <SELECT id="TE_Sort" onchange="changeTicketExplorerFilters(this.id);" style="font-size:24px;">
+                        <SELECT id="TE_Sort" onchange="TE_changeTicketExplorerFilters(this.id);" style="font-size:24px;">
                         <OPTION VALUE="idDesc">Descending ID</OPTION>
                         <OPTION VALUE="id">Ascending ID</OPTION>
                         <OPTION VALUE="dateDesc">Descending Date</OPTION>
@@ -39,7 +39,7 @@
                         </SELECT>
 
                     </div>
-                    <div id="TE_DisplayTicket" style="display:none" onclick="displayTicketExplorerTicketinSambaPOS();">Display Ticket</div>
+                    <div id="TE_DisplayTicket" style="display:none" onclick="TE_displayTicketExplorerTicket();">Display Ticket</div>
                     <div id="TE_Ticket"></div>
                 </div>
             </div>
