@@ -1,6 +1,11 @@
 <?php
 $currentUser = $_SESSION['s_currentuser'];
 
+if ($bypassauth) {
+    $currentUser = 'Admin';
+    $currentTerminal = 'Server';
+}
+
 // populate PHP vars for:
 //
 // $WPID

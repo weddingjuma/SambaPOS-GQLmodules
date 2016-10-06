@@ -52,11 +52,13 @@ var TSK_Tasks = [];
 var TSK_TaskTypes = [];
 
 // POS
+var POS_Menu = {};
+var POS_Ticket = {};
 var selectedCategoryId = 0;
 var categoryIDs = [];
 var orders = [];
-var ticketCustomer = '';
-var ticketTable = '';
+//var ticketCustomer = '';
+//var ticketTable = '';
 var selectedOrderCount = 0;
 var ttl = 0.00;
 var cdttl = 0.00;

@@ -8,110 +8,111 @@ function init_nav() {
 }
 spu.consoleLog('Initializing '+module.replace(/_/,' ').toUpperCase()+' ...');
 
-//initialize menu
-updateCategories();
-updateEntities("Tables");
-updateEntities("Customers");
-$('#orders').empty();
-//orders = [];
-updateTicketOrders();
-selectedOrderCount = 0;
-amcButtons('ticketCommands');
-amcButtons('orderCommands');
-amcButtons('ticketRow1');
-amcButtons('ticketRow2');
-
-
-
 
 $('#categories').on('click', '.cBtn', function(){
-    var highlightID = this.id;
-    selectedCategoryId = highlightID;
-    var catName = this.getAttribute("name");
-    var catBGcolor = this.getAttribute("bgColor");
-    var catIsFastMenu = this.getAttribute("isFastMenu");
+    var selectedDivId = this.id;
+    POS_Menu.selectedCategoryDivId = selectedDivId;
+    POS_Menu.selectedCategoryId = selectedDivId.replace(/c_/,'');
+    POS_Menu.selectedCatName = this.getAttribute("name");
+    POS_Menu.selectedCatBGcolor = this.getAttribute("bgColor");
+    POS_Menu.selectedCatIsFastMenu = this.getAttribute("isFastMenu");
     
-    spu.consoleLog('Category clicked:'+catName+', isFast:'+catIsFastMenu);
+    spu.consoleLog('Category clicked: ['+POS_Menu.selectedCategoryId+'] ('+POS_Menu.selectedCatName+'), isFast:'+POS_Menu.selectedCatIsFastMenu);
     
-    if (catIsFastMenu!=1) {
+    if (POS_Menu.selectedCatIsFastMenu!=1) {
         // get menuItems for the Category
-        spu.consoleLog('Getting Menu Items for: '+catName);
-        updateMenuItems(catName, catBGcolor, catIsFastMenu);
+        POS_updateMenuItems(POS_Menu.selectedCategoryId, POS_Menu.selectedCatName, POS_Menu.selectedCatBGcolor, POS_Menu.selectedCatIsFastMenu);
 
-        // clear all Category Markers
-        for (var c=0; c<categoryIDs.length; c++) {
-            highlightID = 'cm_'+categoryIDs[c];
-            if (document.getElementById(highlightID)) {
-                //spu.consoleLog("hiding:"+highlightID);
-                document.getElementById(highlightID).style.backgroundColor="#363636";
+        // iterate Category Markers
+        for (var c=0; c<POS_Menu.categories.length; c++) {
+            var markerId = 'cm_'+POS_Menu.categories[c].id;
+            if (document.getElementById(markerId)) {
+                // clear Category Marker
+                document.getElementById(markerId).style.backgroundColor="#363636";
+                if ('cm_'+POS_Menu.selectedCategoryId == markerId) {
+                    // set Category Marker
+                    document.getElementById(markerId).style.backgroundColor="#FFBB55";
+                }
             }
 
-        }
-        // set selected Category Marker
-        highlightID = this.id.replace(/c_/,"");
-        highlightID = 'cm_'+highlightID;
-        if (document.getElementById(highlightID)) {
-            document.getElementById(highlightID).style.backgroundColor="#FFBB55";
         }
         
     }
 });
 
 $('#menuItems').on('click', '.mBtn', function(){
-    var miId = this.id;
-    var miName = this.getAttribute("name");
-    var miQuantity = 1;
-    var miPrice = this.getAttribute('price');
-    var orderLineTotal = Number(miQuantity * miPrice).toFixed(2);
-    var oStates = [];
-    oStates.push({stateName:"Status",state:"New"});
-    oStates.push({stateName:"KDStatus",state:"FNotPrinted"});
-    orders.push({id:miId,name:miName,quantity:miQuantity,price:miPrice,orderStates:oStates});
-    var addedOrderId = updateTicketOrders();
-    spu.consoleLog('Order Added: '+miName + '('+addedOrderId+')');
-    
-    // load Order Tag screen
-    gql.EXEC(gql.getOrderTagGroups(miName), function(response) {
-        if (response.errors) {
-            gql.handleError("getOrderTagGroups", response.errors);
-        } else {
-            showOrderTagGroups(response.data.orderTagGroups, addedOrderId);
-        }
-    });
-    
+    POS_menuItemClicked(this.id);    
 });
 $('#menuFast').on('click', '.mBtn', function(){
-    var miName = this.getAttribute("name");
-    var miQuantity = 1;
-    var miPrice = this.getAttribute('price');
+    POS_menuItemClicked(this.id);    
+});
+
+function POS_menuItemClicked(m) {
+    var miDivId        = m;
+    var miId           = miDivId.replace(/m_/,'');
+    var elem           = document.getElementById(miDivId);
+    
+    var miName         = elem.getAttribute("name");
+    var miQuantity     = 1;
+    var miPrice        = elem.getAttribute('price');
+    var productId      = elem.getAttribute('productId');
+    var portion        = elem.getAttribute('portion');
     var orderLineTotal = Number(miQuantity * miPrice).toFixed(2);
+    
     var oStates = [];
     oStates.push({stateName:"Status",state:"New"});
     oStates.push({stateName:"KDStatus",state:"FNotPrinted"});
-    orders.push({name:miName,quantity:miQuantity,price:miPrice,orderStates:oStates});
-    updateTicketOrders();
+    
+    orders.push({id:miId,divid:miDivId,name:miName,quantity:miQuantity,productId:productId,portion:portion,price:miPrice,orderStates:oStates,isSelected:1});
+
+    POS_updateTicketOrders();
     spu.consoleLog('Order Added: '+miName);
+
+    for (var o=0; o<orders.length; o++) {
+        if (document.getElementById('o_'+o)) {
+            document.getElementById('o_'+o).setAttribute("isSelected", "0");
+            document.getElementById('o_'+o).style.backgroundColor = '';
+        }
+    }
+    document.getElementById('o_'+(orders.length-1)).setAttribute("isSelected", "1");
+    document.getElementById('o_'+(orders.length-1)).style.backgroundColor = '#224455';
+    
     
     // load Order Tag screen
-    gql.EXEC(gql.getOrderTagGroups(miName), function(response) {
-        if (response.errors) {
-            gql.handleError("getOrderTagGroups", response.errors);
+    POS_getOrderTagGroups(miName,productId,portion, function t(oTagGroups){
+        if (oTagGroups.length>0) {
+            POS_showOrderTagGroups(oTagGroups, 'o_'+(orders.length-1));
         } else {
-            showOrderTagGroups(response.data.orderTagGroups);
+            POS_closeOrderTagDisplay();
         }
     });
     
-});
+}
 
 $('#orders').on('click', '.orderContainer', function(){
+    spu.consoleLog('Order Selected: '+this.id);
+
     var oId      = this.id;
-    var quantity = this.getAttribute("quantity");
-    var product  = this.getAttribute("product");
-    var price    = this.getAttribute("price");
-    var orderLineTotal    = this.getAttribute("orderLineTotal");
-    var isSelected = (this.getAttribute("isSelected")=='1' ? '0' : '1');
+    var elem     = document.getElementById(oId);
+    
+    var miName = elem.getAttribute("name");
+    var productId = elem.getAttribute("productId");
+    var portion = elem.getAttribute("portion");
+
+    var quantity = elem.getAttribute("quantity");
+    var product  = elem.getAttribute("product");
+    var price    = elem.getAttribute("price");
+    var orderLineTotal    = elem.getAttribute("orderLineTotal");
+    
+    var isSelected = (elem.getAttribute("isSelected")=='1' ? '0' : '1');
+    for (var o=0; o<orders.length; o++) {
+        if (document.getElementById('o_'+o)) {
+            document.getElementById('o_'+o).setAttribute("isSelected", "0");
+            document.getElementById('o_'+o).style.backgroundColor = '';
+        }
+    }
     this.setAttribute("isSelected", isSelected);
-    isSelected = this.getAttribute("isSelected");
+    isSelected = elem.getAttribute("isSelected");
     if (isSelected=='1') {
         selectedOrderCount++;
         this.style.backgroundColor = '#224455';
@@ -119,222 +120,391 @@ $('#orders').on('click', '.orderContainer', function(){
         selectedOrderCount--;
         this.style.backgroundColor = '';
     }
-    spu.consoleLog('ORDERLINE:'+quantity+'x '+product+' '+price+' S:'+isSelected+' bgColor:'+this.style.backgroundColor);
+    spu.consoleLog('ORDERLINE:'+quantity+'x '+product+' '+price+' S:'+isSelected+' bgColor:'+elem.style.backgroundColor);
     spu.consoleLog('selectedOrderCount:'+selectedOrderCount);
 
-    if (selectedOrderCount>0) {
+
+    //if (selectedOrderCount>0) {
+    if (isSelected=='1') {
         $('#selectCustomers').hide();
         $('#selectTables').hide();
         $('#ticketCommands').hide();
         $('#orderCommands').show();
+        // load Order Tag screen
+        POS_getOrderTagGroups(miName,productId,portion, function t(oTagGroups){
+            if (oTagGroups.length>0) {
+                POS_showOrderTagGroups(oTagGroups, oId);
+            } else {
+                POS_closeOrderTagDisplay();
+            }
+        });
     } else {
         $('#orderCommands').hide();
         $('#selectCustomers').show();
         $('#selectTables').show();
         $('#ticketCommands').show();
+        POS_closeOrderTagDisplay();
+
     }
     
     //document.getElementById(oId).click();
+
+});
+
+
+$('#entityGrids').on('click', '.entityBtn', function(){
+    var et  = this.getAttribute("entityType");
+    // singular name of Entity Type
+    var ets = et.substr(0,et.length-1);
+    var selectedEntity = POS_Ticket[ets];
+    var entityName  = this.getAttribute("name");
+    var et  = this.getAttribute("entityType");
+    var entityStatusState = this.getAttribute("statusState");
     
-});
-
-$('#selectCustomers').on('click', function(){
-    var entityType = this.getAttribute("entityType");
-    if (document.getElementById(entityType)) {
-        $('#'+entityType).show();
+    spu.consoleLog("SELECTED:"+et+":"+entityName+":"+entityStatusState);
+    
+    if (document.getElementById(et)) {
+        $('#'+et).hide();
     }
-});
-
-$('#selectTables').on('click', function(){
-    var entityType = this.getAttribute("entityType");
-    if (document.getElementById(entityType)) {
-        $('#'+entityType).show();
-    }
-});
-
-$('#Customers').on('click', '.entityBtn', function(){
-    // singular name of Entity Type
-    var eType = 'Customer';
-    var ticketEntity = ticketCustomer;
-    var entityName  = this.getAttribute("name");
-    var entityType  = this.getAttribute("entityType");
-    var entityStatusState = this.getAttribute("statusState");
-    spu.consoleLog("SELECTED:"+entityType+":"+entityName+":"+entityStatusState);
-    if (document.getElementById(entityType)) {
-        //document.getElementById(entityType).style.display = 'none';
-        $('#'+entityType).hide();
-    }
-    if (document.getElementById('select'+entityType)) {
+    
+    if (document.getElementById('select'+et)) {
         if (entityName=='BACK') {
             // do nothing
         } else if (entityName=='NONE') {
-            document.getElementById('select'+entityType).innerHTML = eType;
-            if (document.getElementById(entityType+'_'+ticketEntity)) {
-                document.getElementById(entityType+'_'+ticketEntity).style.backgroundColor = '';
+            document.getElementById('select'+et).innerHTML = ets;
+            if (document.getElementById(et+'_'+selectedEntity)) {
+                document.getElementById(et+'_'+selectedEntity).style.backgroundColor = '';
             }
-            ticketCustomer = '';
+            POS_Ticket[ets] = '';
         } else {
-            document.getElementById('select'+entityType).innerHTML = eType+"<br /><b style='color:#55FF55'>"+entityName+"</b>";
-            if (ticketEntity != entityName) {
-                if (document.getElementById(entityType+'_'+ticketEntity)) {
-                    document.getElementById(entityType+'_'+ticketEntity).style.backgroundColor = '';
+            document.getElementById('select'+et).innerHTML = ets+"<br /><b style='color:#55FF55'>"+entityName+"</b>";
+            if (selectedEntity != entityName) {
+                if (document.getElementById(et+'_'+selectedEntity)) {
+                    document.getElementById(et+'_'+selectedEntity).style.backgroundColor = '';
                 }
             }
-            ticketCustomer = entityName;
+            POS_Ticket[ets] = entityName;
             this.style.backgroundColor = '#660066';
         }
     }
 });
 
-$('#Tables').on('click', '.entityBtn', function(){
-    // singular name of Entity Type
-    var eType = 'Table';
-    var ticketEntity = ticketTable;
-    var entityName  = this.getAttribute("name");
-    var entityType  = this.getAttribute("entityType");
-    var entityStatusState = this.getAttribute("statusState");
-    spu.consoleLog("SELECTED:"+entityType+":"+entityName+":"+entityStatusState);
-    if (document.getElementById(entityType)) {
-        //document.getElementById(entityType).style.display = 'none';
-        $('#'+entityType).hide();
-    }
-    if (document.getElementById('select'+entityType)) {
-        if (entityName=='BACK') {
-            // do nothing
-        } else if (entityName=='NONE') {
-            document.getElementById('select'+entityType).innerHTML = eType;
-            if (document.getElementById(entityType+'_'+ticketEntity)) {
-                document.getElementById(entityType+'_'+ticketEntity).style.backgroundColor = '';
-            }
-            ticketTable = '';
-        } else {
-            document.getElementById('select'+entityType).innerHTML = eType+"<br /><b style='color:#55FF55'>"+entityName+"</b>";
-            if (ticketEntity != entityName) {
-                if (document.getElementById(entityType+'_'+ticketEntity)) {
-                    document.getElementById(entityType+'_'+ticketEntity).style.backgroundColor = '';
-                }
-            }
-            ticketTable = entityName;
-            this.style.backgroundColor = '#660066';
-        }
-    }
-});
 
-$('#amc_Close_Ticket').click( function () {
+
+
+
+function POS_closeTicket() {
     spu.consoleLog('Closing Ticket...');
+    
+    var entSelected = false;
+    for (var e=0; e<POS_EntityTypes.length; e++) {
+        var et = POS_EntityTypes[e];
+        var ets = et.substr(0,POS_EntityTypes[e].length-1);
+        if (POS_Ticket[ets]) {
+            entSelected = true;
+            break;
+        }
+    }
+    
     if(!orders || orders.length == 0) {
         if (document.getElementById('infoMessage')) {
             document.getElementById('infoMessage').innerHTML = 'No Orders to Submit.';
             document.getElementById('infoMessage').style.display = 'flex';
             //$('#infoMessage').show();
         }
-    } else if(!ticketTable && !ticketCustomer) {
+    } else if(!entSelected) {
         if (document.getElementById('infoMessage')) {
             document.getElementById('infoMessage').innerHTML = 'Select a Table and/or Customer.';
             //document.getElementById('infoMessage').style.display = 'flex';
             $('#infoMessage').show();
         }
     } else {
-        createTicket(orders,ticketTable,ticketCustomer, function(tid) {
+        POS_createTicket(orders, function(tid) {
             var nextTicketStates = [];
                 nextTicketStates.push({stateName:"Status",state:"Unpaid"});
             var orderStateFilters = [];
                 orderStateFilters.push({stateName:"KDStatus",state:"FNotPrinted"});
             var nextOrderStates = [];
                 nextOrderStates.push({stateName:"KDStatus",currentState:"FNotPrinted",state:"FPrinted"});
-            spu.consoleLog('Printing Ticket:'+tid);
+
+            //spu.consoleLog('Printing Ticket:'+tid);
             // printJobName, ticketId, orderStateFilters, nextOrderStates, nextTicketStates, copies, userName
             //gql.EXEC( gql.executePrintJob('BB Print Tasks - ANY',tid, orderStateFilters) );
             //gql.EXEC( gql.executePrintJob('BB Print Tasks HTML - ANY', tid, orderStateFilters, nextOrderStates) );
+
+            for (var e=0; e<POS_EntityTypes.length; e++) {
+                var et = POS_EntityTypes[e];
+                var ets = et.substr(0,POS_EntityTypes[e].length-1);
+
+                POS_updateEntityColor(et, POS_Ticket[ets]);
+
+                POS_Ticket[ets] = '';
+            }
+           
+            orders = [];
+            POS_updateTicketOrders();
         });
-        updateEntityColor('Customers',ticketCustomer);
-        updateEntityColor('Tables',ticketTable);
-        orders = [];
-        updateTicketOrders();
+
     }
-});
+}
 
-//$('#orderTagCloseButton').click( function () {
-//    updateCategories();
-//    if (document.getElementById(selectedCategoryId)) {
-//        document.getElementById(selectedCategoryId).click();
-//    }
-//});
 
-$('#amc_NV_Main_Menu').click( function () {
-    loadNAV('main_menu');
-});
 
-function closeOrderTagDisplay() {
+
+function POS_getMenu(menuName,callback) {
+    gql.EXEC(gql.getMenu(menuName), function(response) {
+        if (response.errors) {
+            gql.handleError("POS_getMenu", response.errors);
+            if(callback) {
+                callback('ERROR');
+            }
+        } else {
+            var menu = response.data.menu;
+            spu.consoleLog('POS_getMenu ('+menuName+')');
+            if(callback) {
+                callback(menu);
+            }
+        }
+    });
+}
+
+function POS_getCategories(menu,callback){
+    categoryIDs = [];
+
+    var menuCategories = menu.categories;
+
+    spu.consoleLog('POS_getCategories ('+menuCategories.length+')');
+
+    var fastStuff = '';
+    var catStuff = '';
+    var firstNonFastCat = -1;
+    var selectedCategoryDivId = '';
+
+    for (var c=0; c<menuCategories.length; c++) {
+        var category = menuCategories[c];
+        var catId = category.id;
+        categoryIDs.push(catId);
+
+        firstNonFastCat = (category.isFastMenu==false && firstNonFastCat<0 ? c : firstNonFastCat);
+        firstNonFastCat = Number(firstNonFastCat);
+
+        var catName = category.name.toString().replace(/\\r/g, " ");
+
+        var catHeader = '';
+        if (category.header!=null) {
+            catHeader = category.header.toString().replace(/\\r/g, "<br />");
+            catHeader = catHeader.replace(/<br>/g, "<br />");
+        }
+
+        var catButtonText = (catHeader!='' ? catHeader : catName);
+
+        var bgColor = '';
+        if (category.color!=null) {
+            bgColor = category.color;
+        } else {
+            bgColor = '#FF333333';
+            bgColor = '#333333';
+        }
+
+        if (c==firstNonFastCat) {
+            var categoryBGcolor = bgColor;
+        }
+
+        var tColor = category.foreground;
+
+        if (category.isFastMenu) {
+            //fastStuff += '<div class="catRow"><div id="c_'+catId+'" name="'+catName+'" value="'+catName+'" isFastMenu="'+menuCategories.isFastMenu+'" bgColor="'+bgColor+'" style="background-color:'+bgColor+';color:'+tColor+';" class="cBtn">';
+            POS_updateMenuItems(catId, menuCategories[c].name, bgColor, 1);
+            //fastStuff += '</div></div>';
+        } else {
+            catStuff += '<div class="catRow"><div id="c_'+catId+'" name="'+catName+'" value="'+catName+'" isFastMenu="0" bgColor="'+bgColor+'" style="background-color:'+bgColor+';color:'+tColor+';" class="cBtn">';
+            catStuff += catButtonText;
+            catStuff += '</div>';
+            catStuff += '<div id="cm_'+catId+'" class="cBtnMarker">&nbsp;</div>';
+            catStuff += '</div>';
+        }
+    }
+
+    $('#categories').empty();
+    $('#categories').append(catStuff);
+
+    if (POS_Menu.selectedCategoryDivId) {
+        selectedCategoryDivId = POS_Menu.selectedCategoryDivId;
+    } else {
+        selectedCategoryDivId = 'c_'+menuCategories[firstNonFastCat].id;
+        POS_Menu.selectedCategoryDivId = selectedCategoryId;
+    }
+    document.getElementById(selectedCategoryDivId).click();
+
+    if (callback) {
+        callback(selectedCategoryDivId);
+    }
+
+}
+
+
+function POS_updateMenuItems(catId, category, categoryBGcolor, categoryIsFastMenu){
+    spu.consoleLog('Getting Menu Items for: '+category);
+
+    itemIDs = [];
+    category = category.toString().replace(/\\r/g, " ");
+    category = category.toString().replace(/&amp;/g, "&");
+    categoryBGcolor = (typeof categoryBGcolor == 'undefined' ? '' : categoryBGcolor);
+    
+    var menuItemColumnCount = 5;
+
+    for (var c=0; c<POS_Menu.categories.length; c++) {
+        if (POS_Menu.categories[c].id == catId) {
+            var items = POS_Menu.categories[c].menuItems;
+            break;
+        }
+    }
+    
+    spu.consoleLog('POS_updateMenuItems:'+category+' ('+items.length+')');
+
+    $('#menuItems').empty();
+
+    for (var i=0; i<items.length; i++) {
+        var item = items[i];
+        var isFastMenu = categoryIsFastMenu;
+        itemIDs.push(item.id);
+        item.name = item.name.toString().replace(/\\r/g, " ");
+        if (item.header!=null) {
+            item.header = item.header.toString().replace(/\\r/g, "<br />");
+            item.header = item.header.toString().replace(/<br>/g, "<br />");
+        }
+
+        var bgColor = '';
+        if (item.color!=null) {
+            bgColor = item.color;
+        } else {
+            if (categoryBGcolor!='') {
+                bgColor = categoryBGcolor;
+            } else {
+                bgColor = '#FF333333';
+                bgColor = '#333333';
+            }
+        }
+
+        var tColor = item.foreground;
+        var itemButtonText = (item.header ? item.header : item.name);
+
+        if (isFastMenu==1) {
+            $('#menuFast').append('<div class="menuItem"><div id="m_'+item.id+'" name="'+item.name+'" value="'+item.name+'" productId="'+item.productId+'" portion="'+item.portion+'" class="mBtn" style="background:'+bgColor+';color:'+tColor+';height:70px;" price="'+item.product.price+'">'+itemButtonText+'</div></div>');
+        } else {
+            $('#menuItems').append('<div class="menuItem"><div id="m_'+item.id+'" name="'+item.name+'" value="'+item.name+'" productId="'+item.productId+'" portion="'+item.portion+'" class="mBtn" style="background:'+bgColor+';color:'+tColor+';" price="'+item.product.price+'">'+itemButtonText+'</div></div>');
+        }
+    }
+
+    if (isFastMenu!=1) {
+        var allElements = $('.menuItem'),
+        WRAP_BY = menuItemColumnCount;
+        for (var i = 0; i < allElements.length; i += WRAP_BY) {
+            //first loop, elements 0 : 15, next loop elements 15:30 and so on
+            allElements.slice(i, i + WRAP_BY).wrapAll('<div class="menuItemButtonRow" />');
+        }
+    }
+
+}
+
+function POS_closeOrderTagDisplay() {
     $('#menuFast').show();
     $('#menuNormal').show();
-    $('#orderTagDisplay').empty();
     $('#orderTagDisplay').hide();
 }
 
-function showOrderTagGroups(orderTagGroups, addedOrderId) {
-            // id,name,color,min,max,tags{id,name,color,description,header,price,rate,filter}
-            var tagGroups = orderTagGroups;
-            
-            if (tagGroups.length > 0) {
-                
-                var otStuff = '';
+function POS_getOrderTagGroups(miName,productId,portion, callback) {
+    $('#orderTagDisplay').html('<div class="info-message">Fetching Order Tags, please Wait...<br /><br />'+busyWheel+'</div>');
 
-                otStuff += '<div style="height:90%;overflow-y:auto;">';
+    var oTagGroups;
+    gql.EXEC(gql.getOrderTagGroups(miName,productId,portion), function(response) {
+        if (response.errors) {
+            gql.handleError("getOrderTagGroups", response.errors);
+        } else {
+            oTagGroups = response.data.orderTagGroups;
+        }
+        if (callback) {
+            callback(oTagGroups);
+        }
+    });
+}
 
-                for (var g=0; g<tagGroups.length; g++) {
-                    var tagGroup = tagGroups[g];
-                    //spu.consoleLog('Order Tag Group: '+tagGroup.name +'-----------------------------------');
+function POS_showOrderTagGroups(orderTagGroups, addedOrderId) {
+    // id,name,color,min,max,tags{id,name,color,description,header,price,rate,filter}
+    var tagGroups = orderTagGroups;
 
-                    otStuff += '<div class="orderTagGroupSection">';
+    if (tagGroups.length > 0) {
 
-                    otStuff += '<div id="orderTagGroup_'+tagGroup.id+'" class="orderTagGroup">'+tagGroup.name+'</div>';
+        var otStuff = '';
 
-                    otStuff += '<div class="orderTagButtonSection">';
+        otStuff += '<div style="height:90%;overflow-y:auto;">';
 
-                    var tags = tagGroup.tags;
-                    for (var t=0; t<tags.length; t++) {
-                        var tag = tags[t];
-                        //spu.consoleLog('Order Tag: '+tag.name);
-                        otStuff += '<div id="otb_'+tag.id+'" class="orderTagButton">'+tag.name+'</div>';
-                    }
+        for (var g=0; g<tagGroups.length; g++) {
+            var tagGroup = tagGroups[g];
+            //spu.consoleLog('Order Tag Group: '+tagGroup.name +'-----------------------------------');
 
-                    otStuff += '</div>';
+            otStuff += '<div class="orderTagGroupSection">';
 
-                    otStuff += '</div>';
+            otStuff += '<div id="orderTagGroup_'+tagGroup.id+'" class="orderTagGroup">'+tagGroup.name+'</div>';
 
-                }
+            otStuff += '<div class="orderTagButtonSection">';
 
-                otStuff += '</div>';
-
-                otStuff += '<div id="orderTagCloseButton" onClick="closeOrderTagDisplay();">CLOSE</div>';
-
-                $('#menuFast').hide();
-                $('#menuNormal').hide();
-                $('#orderTagDisplay').empty();
-                $('#orderTagDisplay').append(otStuff);
-                $('#orderTagDisplay').show();
-                
-                //$('#'+addedOrderId).click();
-                //document.getElementById(addedOrderId).click();
+            var tags = tagGroup.tags;
+            for (var t=0; t<tags.length; t++) {
+                var tag = tags[t];
+                //spu.consoleLog('Order Tag: '+tag.name);
+                otStuff += '<div id="otb_'+tag.id+'" class="orderTagButton">'+tag.name+'</div>';
             }
 
+            otStuff += '</div>';
+
+            otStuff += '</div>';
+
+        }
+
+        otStuff += '</div>';
+
+        otStuff += '<div id="orderTagCloseButton" onClick="POS_closeOrderTagDisplay();">CLOSE</div>';
+
+        
+
+        
+        //$('#'+addedOrderId).click();
+        //document.getElementById(addedOrderId).click();
+    }
+
+//    for (var o=0; o<orders.length; o++) {
+//        document.getElementById('o_'+o).backgroundColor = '';
+//        document.getElementById('o_'+o).setAttribute('isSelected','0');
+//    }
+
+    if (tagGroups.length>0) {
+        $('#menuFast').hide();
+        $('#menuNormal').hide();
+        $('#orderTagDisplay').empty();
+        $('#orderTagDisplay').append(otStuff);
+        $('#orderTagDisplay').show();
+//        document.getElementById(addedOrderId).style.backgroundColor = '#224455';
+//        document.getElementById(addedOrderId).setAttribute('isSelected','1');
+    } else {
+        $('#menuFast').show();
+        $('#menuNormal').show();
+        $('#orderTagDisplay').hide();
+//        document.getElementById(addedOrderId).style.backgroundColor = '';
+//        document.getElementById(addedOrderId).setAttribute('isSelected','0');
+    }
 }
 
 
 
-function updateEntityColor(entityType,entityName){
+function POS_updateEntityColor(entityType,entityName){
     if(!entityName) return;
     gql.EXEC(gql.updateEntityState(entityType,entityName,'Status','New Orders'), function(response) {
         if (response.errors) {
-            gql.handleError("updateEntityColor", response.errors);
+            gql.handleError("POS_updateEntityColor", response.errors);
         } else {
-            if (document.getElementById('Customers_'+entityName)) {
-                var ent = document.getElementById('Customers_'+entityName);
-                ent.style.backgroundColor = 'Orange';
-            }
-            if (document.getElementById('Tables_'+entityName)) {
-                var ent = document.getElementById('Tables_'+entityName);
+            if (document.getElementById(entityType+'_'+entityName)) {
+                var ent = document.getElementById(entityType+'_'+entityName);
                 ent.style.backgroundColor = 'Orange';
             }
         }
@@ -342,40 +512,47 @@ function updateEntityColor(entityType,entityName){
 }
 
 
-function createTicket(orders,ticketTable,ticketCustomer,callback){
+function POS_createTicket(orders,callback){
     //var ticketID = 0;
-    gql.EXEC(gql.addTicket(orders,ticketTable,ticketCustomer), function(response) {
+    var ticketEntities = [];
+    for (var e=0; e<POS_EntityTypes.length; e++) {
+        var et = POS_EntityTypes[e];
+        var ets = et.substr(0,POS_EntityTypes[e].length-1);
+        if (POS_Ticket[ets]) {
+            // {entityType:"Tables",name:"'+tableName+'"}
+            ticketEntities.push('{entityType:"'+et+'",name:"'+POS_Ticket[ets]+'"}');
+        }
+    }
+                
+    gql.EXEC(gql.addTicket(orders,ticketEntities), function(response) {
         if (response.errors) {
-            gql.handleError("createTicket", response.errors);
+            gql.handleError("POS_createTicket", response.errors);
         } else {
+            
             var ticketID = response.data.addTicket.id;
-            if (document.getElementById('Customers_'+ticketCustomer)) {
-                document.getElementById('Customers_'+ticketCustomer).style.backgroundColor = '';
-                var tids = document.getElementById('Customers_'+ticketCustomer).getAttribute("ticketIDs");
-                tids = (tids.length>0 ? tids+','+ticketID : ticketID);
-                document.getElementById('Customers_'+ticketCustomer).setAttribute("ticketIDs",tids);
-                document.getElementById('Customers_'+ticketCustomer).setAttribute("statusState",'New Orders');
-                document.getElementById('Customers_'+ticketCustomer).setAttribute("class",'entityBtn statusState_New_Orders');
+            
+            for (var e=0; e<POS_EntityTypes.length; e++) {
+                var et = POS_EntityTypes[e];
+                var ets = et.substr(0,POS_EntityTypes[e].length-1);
+                if (document.getElementById(et+'_'+POS_Ticket[ets])) {
+                    document.getElementById(et+'_'+POS_Ticket[ets]).style.backgroundColor = '';
+                    var tids = document.getElementById(et+'_'+POS_Ticket[ets]).getAttribute("ticketIDs");
+                        tids = (tids.length>0 ? tids+','+ticketID : ticketID);
+                    document.getElementById(et+'_'+POS_Ticket[ets]).setAttribute("ticketIDs",tids);
+                    document.getElementById(et+'_'+POS_Ticket[ets]).setAttribute("statusState",'New Orders');
+                    document.getElementById(et+'_'+POS_Ticket[ets]).setAttribute("class",'entityBtn statusState_New_Orders');
+                }
+                
+                $('#select'+et).html(ets+'<br />&nbsp;');
             }
-            if (document.getElementById('Tables_'+ticketTable)) {
-                document.getElementById('Tables_'+ticketTable).style.backgroundColor = '';
-                var tids = document.getElementById('Tables_'+ticketTable).getAttribute("ticketIDs");
-                tids = (tids.length>0 ? tids+','+ticketID : ticketID);
-                document.getElementById('Tables_'+ticketTable).setAttribute("ticketIDs",tids);
-                document.getElementById('Tables_'+ticketTable).setAttribute("statusState",'New Orders');
-                document.getElementById('Tables_'+ticketTable).setAttribute("class",'entityBtn statusState_New_Orders');
-            }
+            
             refreshTicket();
-            if (document.getElementById('selectCustomers')) {
-                document.getElementById('selectCustomers').innerHTML = "Customer";
+            
+            spu.consoleLog('Created Ticket:'+ticketID);
+
+            if (callback) {
+                callback(ticketID);
             }
-            if (document.getElementById('selectTables')) {
-                document.getElementById('selectTables').innerHTML = "Table";
-            }
-           ticketTable = '';
-           ticketCustomer = '';
-           spu.consoleLog('Created Ticket:'+ticketID);
-           return callback(ticketID);
         }
     });
 }
@@ -384,150 +561,8 @@ function refreshTicket(){
     gql.EXEC(gql.postTicketRefreshMessage('0'));
 }
 
-function updateCategories(){
-    categoryIDs = [];
-    gql.EXEC(gql.getMenuCategories(), function(response) {
-        if (response.errors) {
-            gql.handleError("updateCategories", response.errors);
-        } else {
-            var menuCategories = response.data.menuCategories;
-            spu.consoleLog('updateCategories ('+menuCategories.length+')');
 
-            var fastStuff = '';
-            var catStuff = '';
-            var firstNonFastCat = -1;
-            
-            for (var c=0; c<menuCategories.length; c++) {
-                var category = menuCategories[c];
-                var catId = category.id;
-                categoryIDs.push(catId);
-
-                firstNonFastCat = (category.isFastMenu==false && firstNonFastCat<0 ? c : firstNonFastCat);
-                firstNonFastCat = Number(firstNonFastCat);
-                
-                var catName = category.name.toString().replace(/\\r/g, " ");
-
-                var catHeader = '';
-                if (category.header!=null) {
-                    catHeader = category.header.toString().replace(/\\r/g, "<br />");
-                    catHeader = catHeader.replace(/<br>/g, "<br />");
-                }
-
-                var catButtonText = (catHeader!='' ? catHeader : catName);
-
-                var bgColor = '';
-                if (category.color!=null) {
-                    bgColor = category.color;
-                } else {
-                    bgColor = '#FF333333';
-                }
-                if (bgColor.indexOf("#")==0) {
-                    bgColor = bgColor.substr(3,6);
-                    var DL = darkOrLight(bgColor);
-                    bgColor = "#" + bgColor;
-                    var tColor = (DL=="light-text" ? "#FFFFFF" : "#000000");
-                }
-                //if (c==0) {
-                if (c==firstNonFastCat) {
-                    var categoryBGcolor = bgColor;
-                }
-                
-                if (category.isFastMenu) {
-                    //fastStuff += '<div class="catRow"><div id="c_'+catId+'" name="'+catName+'" value="'+catName+'" isFastMenu="'+menuCategories.isFastMenu+'" bgColor="'+bgColor+'" style="background-color:'+bgColor+';color:'+tColor+';" class="cBtn">';
-                    updateMenuItems(menuCategories[c].name, bgColor, 1);
-                    //fastStuff += '</div></div>';
-                } else {
-                    catStuff += '<div class="catRow"><div id="c_'+catId+'" name="'+catName+'" value="'+catName+'" isFastMenu="0" bgColor="'+bgColor+'" style="background-color:'+bgColor+';color:'+tColor+';" class="cBtn">';
-                    catStuff += catButtonText;
-                    catStuff += '</div>';
-                    catStuff += '<div id="cm_'+catId+'" class="cBtnMarker">&nbsp;</div>';
-                    catStuff += '</div>';
-                }
-            }
-
-            $('#categories').empty();
-            $('#categories').append(catStuff);
-            //$('#menuFast').empty();
-            //$('#menuFast').append(fastStuff);
-
-            selectedCategoryId = 'c_'+menuCategories[firstNonFastCat].id;
-
-            //updateMenuItems(menuCategories[0].name, categoryBGcolor, menuCategories[0].isFastMenu);
-            //updateMenuItems(menuCategories[firstNonFastCat].name, categoryBGcolor, menuCategories[firstNonFastCat].isFastMenu);
-            document.getElementById('c_'+menuCategories[firstNonFastCat].id).click();
-        }
-    });
-}
-
-function updateMenuItems(category, categoryBGcolor, categoryIsFastMenu){
-    itemIDs = [];
-    category = category.toString().replace(/\\r/g, " ");
-    category = category.toString().replace(/&amp;/g, "&");
-    categoryBGcolor = (typeof categoryBGcolor == 'undefined' ? '' : categoryBGcolor);
-    
-    var menuItemColumnCount = 5;
-
-    gql.EXEC(gql.getMenuItems(category), function(response) {
-        if (response.errors) {
-            gql.handleError("updateMenuItems", response.errors);
-        } else {                      
-            spu.consoleLog('updateMenuItems:'+category+' ('+response.data.items.length+')');
-
-            $('#menuItems').empty();
-
-            for (var i=0; i<response.data.items.length; i++) {
-                var item = response.data.items[i];
-                var isFastMenu = categoryIsFastMenu;
-                itemIDs.push(item.id);
-                item.name = item.name.toString().replace(/\\r/g, " ");
-                if (item.header!=null) {
-                    item.header = item.header.toString().replace(/\\r/g, "<br />");
-                    item.header = item.header.toString().replace(/<br>/g, "<br />");
-                }
-
-                if (item.color!=null) {
-                    bgColor = item.color;
-                } else {
-                    if (categoryBGcolor!='') {
-                        bgColor = categoryBGcolor;
-                    } else {
-                        bgColor = '#FF333333';
-                    }
-                }
-                if (bgColor.indexOf("#")==0) {
-                    if (bgColor.length>7) {
-                        bgColor = bgColor.substr(3,6);
-                    } else {
-                        bgColor = bgColor.substr(1,6);
-                    }
-                    DL = darkOrLight(bgColor);
-                    bgColor = "#" + bgColor;
-                    tColor = (DL=="light-text" ? "#FFFFFF" : "#000000");
-                }
-
-                var itemButtonText = (item.header ? item.header : item.name);
-                if (isFastMenu==1) {
-                    $('#menuFast').append('<div class="menuItem"><div id="m_'+item.id+'" name="'+item.name+'" value="'+item.name+'" class="mBtn" style="background:'+bgColor+';color:'+tColor+';height:70px;" price="'+item.product.price+'">'+itemButtonText+'</div></div>');
-                } else {
-                    $('#menuItems').append('<div class="menuItem"><div id="m_'+item.id+'" name="'+item.name+'" value="'+item.name+'" class="mBtn" style="background:'+bgColor+';color:'+tColor+';" price="'+item.product.price+'">'+itemButtonText+'</div></div>');
-                }
-            }
-            //});
-
-            if (isFastMenu!=1) {
-                var allElements = $('.menuItem'),
-                WRAP_BY = menuItemColumnCount;
-                for (var i = 0; i < allElements.length; i += WRAP_BY) {
-                    //first loop, elements 0 : 15, next loop elements 15:30 and so on
-                    allElements.slice(i, i + WRAP_BY).wrapAll('<div class="menuItemButtonRow" />');
-                }
-            }
-            
-        }
-    });
-}
-
-function updateTicketOrders(){
+function POS_updateTicketOrders(){
     var ttl=0.00;
     $('#orders').empty();
     for (var o=0; o<orders.length; o++) {
@@ -535,9 +570,12 @@ function updateTicketOrders(){
         var orderId = order.id;
         var price = Number(order.price).toFixed(2);
         var orderLineTotal = Number(order.quantity * price).toFixed(2);
-        var oStates = order.states;
+        var oStates = order.orderStates;
+        
         var stuff = '';
-        stuff += '<div id="o_'+orderId+'_'+o+'" class="orderContainer" product="'+order.name+'" quantity="'+order.quantity+'" price="'+price+'" orderLineTotal="'+orderLineTotal+'" isSelected="0">';
+        // orders.push({id:miId,divid:miDivId,name:miName,quantity:miQuantity,productId:productId,portion:portion,price:miPrice,orderStates:oStates});
+
+        stuff += '<div id="o_'+o+'" class="orderContainer" name="'+order.name+'" product="'+order.name+'" productId="'+order.productId+'" portion="'+order.portion+'" quantity="'+order.quantity+'" price="'+price+'" orderLineTotal="'+orderLineTotal+'" isSelected="'+order.isSelected+'">';
             stuff += '<div class="orderLine">';
             stuff += '    <div class="orderQuantity">'+order.quantity+'</div>';
             stuff += '    <div class="orderName">'+order.name+'</div>';
@@ -564,34 +602,35 @@ function updateTicketOrders(){
     ttl = ttl.toFixed(2);
     $('#ticketTotalValue').html(ttl);
     
+    
     return 'o_'+orderId+'_'+o;
 }
 
-function updateEntities(entityType, callback){
+function POS_fillEntityGrid(entityType, callback){
     gql.EXEC(gql.getEntities(entityType), function(response) {
         if (response.errors) {
-            gql.handleError("updateEntities", response.errors);
+            gql.handleError("POS_getEntities", response.errors);
         } else {
-            spu.consoleLog('updateEntities:'+entityType+' ('+response.data.entities.length+')');
-            // singular name of entityType
-            var eType = entityType.substr(0,entityType.length-1);
-            var ticketEntity = '';
-            if (entityType=="Customers") {
-                ticketEntity = ticketCustomer;
-            }
-            if (entityType=="Tables") {
-                ticketEntity = ticketTable;
-            }
+            var entities = response.data.entities;
+            spu.consoleLog('POS_getEntities:'+entityType+' ('+entities.length+')');
             
-            $('#'+entityType).empty();
-            $('#'+entityType).append('<div id="'+entityType+'_BACK" name="BACK" entityType="'+entityType+'" state="" class="entityBtn" style="background-color:#000088;font-size:50px;">[ &lt; ]</div>');
-            $('#'+entityType).append('<div id="'+entityType+'_NONE" name="NONE" entityType="'+entityType+'" state="" class="entityBtn" style="background-color:#880000;font-size:50px;">[ X ]</div>');
+            // singular name of entityType
+            var ets = entityType.substr(0,entityType.length-1);
+            
+            var ticketEntity = '';
+            ticketEntity = POS_Ticket[ets];
+            
+            var egstuff = '';
+            
+            egstuff += '<div id="'+entityType+'" class="entityGrid" style="display:none;">';
+            egstuff += '<div id="'+entityType+'_BACK" name="BACK" entityType="'+entityType+'" state="" class="entityBtn" style="background-color:#000088;font-size:50px;">[ &lt; ]</div>';
+            egstuff += '<div id="'+entityType+'_NONE" name="NONE" entityType="'+entityType+'" state="" class="entityBtn" style="background-color:#880000;font-size:50px;">[ X ]</div>';
 
-            jsonData = response.data.entities;
+            jsonData = entities;
             jsonData = sortJSON(jsonData,"name",true);
 
-            for (var e=0; e<response.data.entities.length; e++) {
-                var entity = response.data.entities[e];
+            for (var e=0; e<entities.length; e++) {
+                var entity = entities[e];
 
                 for (var s=0; s<entity.states.length; s++) {
                     var ST = entity.states[s];
@@ -606,20 +645,41 @@ function updateEntities(entityType, callback){
                 if (orders.length>0 && ticketEntity==entity.name) {
                     bgc=' style="background-color:#660066"';
                     if (document.getElementById('select'+entityType)) {
-                        document.getElementById('select'+entityType).innerHTML = eType+"<br /><b style='color:#55FF55'>"+ticketEntity+"</b>";
+                        document.getElementById('select'+entityType).innerHTML = ets+"<br /><b style='color:#55FF55'>"+ticketEntity+"</b>";
                     }
                 }
 
-                $('#'+entityType).append('<div id="'+entityType+'_'+entity.name+'" name="'+entity.name+'" entityType="'+entityType+'" statusState="'+entity.statusState+'" ticketIDs="" class="entityBtn statusState_'+entity.statusStateClass+'"'+bgc+'>'+entity.name+'</div>');
+                egstuff += '<div id="'+entityType+'_'+entity.name+'" name="'+entity.name+'" entityType="'+entityType+'" statusState="'+entity.statusState+'" ticketIDs="" class="entityBtn statusState_'+entity.statusStateClass+'"'+bgc+'>'+entity.name+'</div>';
             }
 
-
+            egstuff += '</div>';
+            
+            $('#entityGrids').append(egstuff);
+        }
+        if (callback) {
+            callback(entities);
         }
     });
 
 }
 
-function amcButtons(mapping) {
+function POS_getEntitySelectors() {
+    spu.consoleLog('Getting TEntity Selector buttons...');
+    var estuff = '';
+    for (var e=0; e<POS_EntityTypes.length; e++) {
+        var et = POS_EntityTypes[e];
+        var ets = et.substr(0,POS_EntityTypes[e].length-1);
+        estuff += '<div id="select'+et+'" class="buttonMain" entityType="'+et+'" onClick="POS_showEntityGrid(\''+et+'\');">'+ets+'<br />...</div>';
+    }
+    $('#ticketEntitySelectors').append(estuff);
+}
+
+function POS_showEntityGrid(entityType) {
+    spu.consoleLog('Showing Entity Grid: '+entityType);
+    $('#'+entityType).show();
+}
+
+function POS_amcButtons(mapping) {
     switch (mapping) {
         case 'ticketCommands':
             var amcButtons = amcBtns_ticketCommands;
@@ -640,8 +700,21 @@ function amcButtons(mapping) {
     $('#'+mapping).empty();
     for (var b=0; b<amcButtons.length; b++) {
         var btn = amcButtons[b];
-        var btnStuff = '<div id="amc_'+btn["buttonID"]+'" name="'+btn["buttonName"]+'" class="buttonMain" style="background-color:'+btn["btnBGcolor"]+';color:'+btn["btnTextColor"]+'">'+btn["buttonHeader"]+'</div>';
+        var btnStuff = '<div id="amc_'+btn["buttonID"]+'" name="'+btn["buttonName"]+'" class="buttonMain" onclick="POS_processCommand(\''+btn["buttonID"]+'\');" style="background-color:'+btn["btnBGcolor"]+';color:'+btn["btnTextColor"]+'">'+btn["buttonHeader"]+'</div>';
         $('#'+mapping).append(btnStuff);
     }
 }
 
+function POS_processCommand(cmd) {
+    spu.consoleLog('Processing POS Command: '+cmd);
+    switch(cmd) {
+        case 'Close_Ticket':
+            POS_closeTicket();
+            break;
+        case 'NV_Main_Menu':
+            navigateTo('module','main_menu','main_menu');
+            break;
+        default:
+            spu.consoleLog('Unhandled POS Command: '+cmd);
+    }
+}

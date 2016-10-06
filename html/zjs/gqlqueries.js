@@ -311,7 +311,11 @@ gql.getEntities = function(entityType, search, stateFilter){
 
 
 // PMPOS
-    
+
+gql.getMenu = function(menuName){
+    return '{menu:getMenu(name:"'+menuName+'"){categories{id,name,color,foreground,image,header,menuId,isFastMenu,menuItems{id,name,color,foreground,image,header,caption,categoryId,productId,portion,quantity,defaultOrderTags,product{id,name,barcode,groupCode,price,portions{id,name,productId,price}}}}}}';
+};
+
 gql.getMenuCategories = function(){
     return '{menuCategories: getMenuCategories(menu:"Menu"){id,name,header,color,image,isFastMenu,menuId,menuItems{id,name,header,caption,image,color,categoryId,portion,productId,product{id,name,groupCode,barcode,price,portions{id,name,productId,price}}}}}';
 };
@@ -323,8 +327,8 @@ gql.getMenuItems = function(category){
     return '{items:getMenuItems(menu:"Menu",category:"'+category+'"){id,name,header,caption,color,portion,product{groupCode,name,price,portions{name,price}}}}';
 };
 
-gql.getOrderTagGroups = function(menuItem){
-    return '{orderTagGroups:getOrderTagGroups(menuItem:"'+menuItem+'",portion:"",ticketType:"Ticket",terminal:"Server",department:"Restaurant",user:"Q"){id,name,color,min,max,tags{id,name,color,description,header,price,rate,filter}}}';
+gql.getOrderTagGroups = function(menuItem,productId,portion){
+    return '{orderTagGroups:getOrderTagGroups(productName:"'+menuItem+'",productId:'+productId+',portion:"'+portion+'",ticketType:"'+ticketTypeName+'",terminal:"Server",department:"'+departmentName+'",user:"Q",hidden:false){id,name,color,min,max,tags{id,name,color,description,header,price,rate,filter}}}';
 };
 
 gql.executePrintJob = function(printJobName, ticketId, orderStateFilters, nextOrderStates, nextTicketStates, copies, userName){
@@ -358,32 +362,34 @@ gql.executePrintJob = function(printJobName, ticketId, orderStateFilters, nextOr
     return xpj;
 };
 
-gql.addTicket = function(orders,tableName,customerName){
+gql.addTicket = function(orders,ticketEntities){
 
     var orderLines = orders.map(function (order) {
         return '{name:"' + order.name + '",states:[{stateName:"Status",state:"Submitted"},{stateName:"KDStatus",state:"FNotPrinted"}]}';
     });
     
-    var entityPart = (tableName && customerName
-                        ? 'entities:[{entityType:"Tables",name:"'+tableName+'"},{entityType:"Customers",name:"'+customerName+'"}]'
-                        : (tableName 
-                            ?  'entities:[{entityType:"Tables",name:"'+tableName+'"}]'
-                            : (customerName 
-                                ?  'entities:[{entityType:"Customers",name:"'+customerName+'"}]' 
-                                : '')
-                            )
-                        );
+//    var entityPart = (tableName && customerName
+//                        ? 'entities:[{entityType:"Tables",name:"'+tableName+'"},{entityType:"Customers",name:"'+customerName+'"}]'
+//                        : (tableName 
+//                            ?  'entities:[{entityType:"Tables",name:"'+tableName+'"}]'
+//                            : (customerName 
+//                                ?  'entities:[{entityType:"Customers",name:"'+customerName+'"}]' 
+//                                : '')
+//                            )
+//                        );
+    
+    var entityPart = 'entities:['+ticketEntities+']';
     
     var q = '';
     q += 'mutation m{addTicket(';
-    q += '        ticket:{ticketType:"Ticket"';
-    q += '            , department:"Restaurant"';
+    q += '        ticket:{type:"'+ticketTypeName+'"';
+    q += '            , department:"'+departmentName+'"';
     q += '            , user:"'+currentUser+'"';
     //q += '            , terminal:"'+currentTerminal+'"';
     q += '            , terminal:"Server"';
     q += '            , '+entityPart;
     q += '            , states:[{stateName:"Status",state:"Unpaid"}]';
-    q += '            , orders:['+orderLines.join()+'}]';
+    q += '            , orders:['+orderLines.join()+']';
     q += '        }){id}}';
     return q;
 };

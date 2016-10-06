@@ -78,12 +78,11 @@ function loadMODULE(modscreen) {
                         spu.consoleLog('POS NOT ready.  Workperiod is CLOSED.');
                         showInfoMessage('Workperiod is CLOSED.<br /><br />Click to Retry.');
                     }
+                    POS_refreshPOSDisplay();
                 });
             }
             
             if (modscreen=='kitchen_display') {
-//                KD_HTMLtaskType = 'BB Bump Bar Task HTML';
-//                KD_GUItaskType = 'BB Bump Bar Task';
                 KD_refreshTaskList();
             }
             if (modscreen=='customer_display') {
@@ -183,15 +182,28 @@ $(document).ready(function(){
     loadMODULE(module);
 
     $('#infoMessage').click(function () {
-        $('#infoMessage').hide();
-        if (!WPisOpen) {
-            loadMODULE('main_menu');
-        }
+        workperiodCheck('',function wpo(workperiod){
+            WPisOpen = workperiod.isOpen;
+            if (!workperiod.isOpen) {
+                spu.consoleLog('POS NOT ready.  Workperiod is CLOSED.');
+                navigateTo('module','main_menu','main_menu');
+                $('#infoMessage').hide();
+            } else {
+                $('#infoMessage').hide();
+            }
+        });
     });
 
-    if (WPID < 1 && module=='pos') {
-        showInfoMessage('Workperiod is CLOSED.<br /><br />Click to Retry.');
-        return;
+    if (module=='pos') {
+        workperiodCheck('',function wpo(workperiod){
+            WPisOpen = workperiod.isOpen;
+            if (!workperiod.isOpen) {
+                spu.consoleLog('POS NOT ready.  Workperiod is CLOSED.');
+                showInfoMessage('Workperiod is CLOSED.<br /><br />Click to Retry.');
+            } else {
+                $('#infoMessage').hide();
+            }
+        });
     }
     
   
@@ -2362,5 +2374,48 @@ function TE_displayTicketExplorerTicketinSambaPOS() {
         var name = 'HUB Display Ticket in SambaPOS';
         var value = $('#TicketExplorerTicket').attr('ticketId');
         spu.executeAutomationCommand(name,value);
+    }
+}
+
+
+function POS_refreshPOSDisplay() {
+//    $('#selectCustomers').html("Customer<br /><b style='color:#55FF55'>"+POS_Ticket.ticketCustomer+"</b>");
+//    $('#selectTables').html("Table<br /><b style='color:#55FF55'>"+POS_Ticket.ticketTable+"</b>");
+
+    POS_getEntitySelectors();
+    POS_amcButtons('ticketCommands');
+    POS_amcButtons('orderCommands');
+    POS_amcButtons('ticketRow1');
+    POS_amcButtons('ticketRow2');
+
+    $('#entityGrids').empty();
+    for (var e=0;e<POS_EntityTypes.length; e++) {
+        var et  = POS_EntityTypes[e];
+        var ets = et.substr(0,et.length-1);
+        
+        POS_fillEntityGrid(et);
+
+        POS_Ticket[ets] = (typeof POS_Ticket[ets]==='undefined' ? '' : POS_Ticket[ets]);
+        
+        $('#select'+et).html(ets+'<br /><b style="color:#55FF55">'+(POS_Ticket[ets]!='' ? POS_Ticket[ets] : '&nbsp;')+'</b>');
+
+    }
+
+    $('#orders').empty();
+    POS_updateTicketOrders();
+    selectedOrderCount = 0;
+
+    if (!POS_Menu.selectedCategoryDivId) {
+        POS_getMenu(menuName, function m(menu){
+            POS_Menu = menu;
+            POS_getCategories(POS_Menu, function c(selectedCategoryDivId){
+                $('#'+selectedCategoryDivId).click();
+            });
+        });
+    } else {
+        POS_getCategories(POS_Menu, function c(selectedCategoryDivId){
+            document.getElementById(selectedCategoryDivId).click();
+            $('#'+selectedCategoryDivId).click();
+        });
     }
 }
