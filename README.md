@@ -22,7 +22,10 @@ Runs in any ES5 compliant Browser.
 
  - edit the file: \zconfigs\config.js
 
-### Help / Discussion (not issues)
+### Additional Setup / Discussion (not issues)
 
  - https://forum.sambapos.com/t/sambapos-remote-client-gql-modules/
 
+### Issues
+
+ - Issues can be reported here on github.
