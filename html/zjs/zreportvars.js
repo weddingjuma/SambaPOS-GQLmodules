@@ -1,4 +1,5 @@
 function getReportVars(reportName,callback) {
+    spu.consoleLog('Getting ReportVars...');
     
     var dataArray = [];
     
@@ -62,10 +63,12 @@ function getReportVars(reportName,callback) {
                 break;
         }
         
+        spu.consoleLog('Got ReportVars: ' + dataArray.length);
+        
         if (callback) {
             callback(dataArray);
         }
     });
     
-    return dataArray;
+    //return dataArray;
 }
