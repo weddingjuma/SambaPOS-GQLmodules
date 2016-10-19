@@ -4,6 +4,13 @@ GLOBAL VARS
 
 var users;
 
+var currentUserData = {};
+    currentUserData.name = 'unknownUser';
+    currentUserData.PIN = '';
+    currentUserData.validated = false;
+    
+var clientIP;
+
 var sessionId;
 
 var isConnected = false;

@@ -1722,6 +1722,26 @@ width: 22%;
     border-color:#FFDDDD;
     z-index:150;
 }
+#USER_Auth {
+    display:flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    align-content: stretch;
+    flex-direction:column;
+    position:fixed;
+    top:0px;
+    left:0px;
+    bottom:0px;
+    right:0px;
+    z-index:200;
+    margin:auto;
+    justify-content:space-around;
+    color:#FFFFFF;
+    background-color:#9955;
+    background-color:rgba(0,0,100,0.9);
+    text-align: center;
+    font-size: 6vh;
+}
 
 #NAV_MainMenuDisplay {
     margin:auto;

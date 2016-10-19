@@ -163,8 +163,9 @@ spu.executeAutomationCommand = function(name,value) {
     window.external.ExecuteAutomationCommand(name,value);
 };
 
-function getUsers(callback) {
-    var users = [];
+spu.getUsers = function (callback) {
+    spu.consoleLog('Getting Users...');
+    users = [];
     //getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters,function currentWP(report) {
     getCustomReport('PHP Users','Admin','','','','',function r(report){
         for (var t=0; t<report.tables.length; t++) {
@@ -184,13 +185,102 @@ function getUsers(callback) {
                 users.push(userData);
             }
         }
+        
+        spu.consoleLog('Got Users: ' +users.length);
+        
         if (callback) {
             callback(users);
         }
 
     });
-    //return users;
 };
+
+spu.validateUser = function (user, pin, callback) {
+    spu.consoleLog('Validating User ...');
+    
+    if (bypassAllAuth) {
+        spu.consoleLog('ALL USER AUTHENTICATION IS BYPASSED.');
+        if (callback) {
+            callback();
+        }
+        return;
+    }
+    
+    var bypassMatch = false;
+    
+    if (allowAuthBypass) {
+        
+        $.getJSON('//freegeoip.net/json/?callback=?', function(data) {
+            clientIP = data.ip;
+            spu.consoleLog('CLIENT IP:' +clientIP);
+            
+            for (var i=0; i<bypassIPs.length; i++) {
+                if (clientIP == bypassIPs[i]) {
+                    bypassMatch = (allowAuthBypass ? true : false);
+                    break;
+                }
+            }
+
+            if (!bypassMatch) {
+
+                if (!currentUserData.validated || !currentUserData.name || !currentUserData.PIN || currentUserData.PIN == '') {
+                    var pin = prompt("Enter PIN:");
+                    var pinhash  = CryptoJS.SHA512(pin).toString().toUpperCase();
+                    //spu.consoleLog('Supplied Hash: '+pinhash);
+
+                    for (var u=0; u<users.length; u++) {
+                        var passhash = users[u].PIN.toUpperCase();
+                        //spu.consoleLog('Checking against Hash: '+passhash);
+                        if (pinhash == passhash) {
+                            currentUserData = users[u];
+                            currentUserData.validated = true;
+                            //currentUser = currentUserData.name;
+                            spu.consoleLog('User Validated: '+currentUserData.name);
+                            break;
+                        }
+                    }
+                }
+
+                if (!currentUserData.validated) {
+                    spu.consoleLog('User Validation FAILED!');
+                    logoutUser();
+                }
+
+            } else {
+                spu.consoleLog('User Validation Bypass for: ' + bypassIPs[i]);
+            }
+
+            if (callback) {
+                callback(currentUserData);
+            }
+
+        });
+
+    }
+    
+};
+
+function logoutUser () {
+    currentUserData = {};
+    currentUserData.name = 'unknownUser';
+    currentUserData.PIN = '';
+    currentUserData.validated = false;
+    
+    //currentUser = currentUserData.name;
+
+    spu.getUsers(function u(data){
+        users = data;
+        spu.validateUser('','',function v(vdata){
+            var user = vdata;
+            spu.consoleLog(user.name+(user.validated ? '' : ' NOT')+' validated.');
+        });
+    });
+}
+
+$.getJSON('//freegeoip.net/json/?callback=?', function(data) {
+    clientIP = data.ip;
+    spu.consoleLog('CLIENT IP:' +clientIP);
+});
 
 function session_id() {
     return /SESS\w*ID=([^;]+)/i.test(document.cookie) ? RegExp.$1 : false;

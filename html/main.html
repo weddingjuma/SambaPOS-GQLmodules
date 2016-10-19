@@ -3,12 +3,12 @@
         <div id="top">
             <div id="module" onClick="navigateTo('module','main_menu','main_menu');" title="Click here for Main Menu">???</div>
             <div id="indicators" onClick="chatShowFull();">
-                <div id="connection" title="Connection Status">...</div>
-                <div id="workperiod" title="Workperiod ID/Status">...</div>
+                <div id="connection" title="Connection Status: GREEN=Connected">...</div>
+                <div id="workperiod" title="Workperiod ID/Status: GREEN=Open">...</div>
                 <div id="battery" title="Battery Level">...</div>
                 <div id="MSG_messaging" title="Click here to go to Fullscreen Messaging." onClick="chatShowFull();"><div class="MSG_Indicator MSG_OldMessage">MSG</div></div>
             </div>
-            <div id="currentUser">[Terminal] (User)</div>
+            <div id="currentUser" title="Current Terminal and User.  Click to Logout" onClick="logoutUser();">[Terminal] (User)</div>
             <div id="signalRbytes" title="SignalR KB" onClick="clearTrafficBytes('signalr');">0.00</div>
             <div id="GQLbytes" title="GraphQL KB sent/rcvd/TTL" onClick="clearTrafficBytes('gql');">0.00/0.00/0.00</div>
             <div id="clock_dateTime" title="Current Date/Time">
@@ -26,6 +26,7 @@
     <!-- hidden elements -->
     <div id="entityGrids"></div>
     <div id="infoMessage" title="click to close" style="display:none"></div>
+    <div id="USER_Auth" title="enter your PIN to continue" style="display:none"></div>
     <div id="errorMessage" style="display:none"></div>
     <div id="helpMessage" style="display:none"></div>
     <div id="MSG_fullscreen" style="display:none">

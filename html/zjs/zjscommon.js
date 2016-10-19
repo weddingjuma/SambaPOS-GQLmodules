@@ -7,14 +7,6 @@ function loadMODULE(modscreen) {
     
     spu.refreshMoments();
     
-//    var users;
-//    getUsers(function u(stuff){
-//        users = stuff;
-//        spu.consoleLog(users[0].PIN);
-//    });
-//    var passhash = CryptoJS.SHA512('1234').toString();
-//    spu.consoleLog(passhash);
-    
     if (inSambaPOS) {
         // if the page is running inside SambaPOS HTML Viewer Widget
         // get rid of Top and Bottom bars
@@ -202,10 +194,8 @@ $(document).ready(function(){
         customReports = data;
     });
     
-    getReportVars('PHP Users',function rl(data){
-        users = data;
-    });
-    
+
+    logoutUser();
 
     spu.getBusinessSettings();
 
