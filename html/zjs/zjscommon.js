@@ -181,6 +181,12 @@ $(document).ready(function(){
         spu.getEmbeddedUserTerminal();
     }
 
+    getReportVars('PHP Custom Reports',function rl(data){
+        customReports = data;
+    });
+    getReportVars('PHP Users',function rl(data){
+        users = data;
+    });
 
 //    users = getReportVars('PHP Users');
 
@@ -1842,8 +1848,6 @@ function setReportFilterDefaults(callback) {
 function refreshReportDisplay() {
     $('#REP_Reports').html('<div class="info-message">Fetching Reports, please Wait...<br /><br />'+busyWheel+'</div>');
     var replist = '';
-    getReportVars('PHP Custom Reports',function rl(data){
-        customReports = data;
         if (customReports.length>0) {
             for (var r=0; r<customReports.length; r++) {
                 var rep = customReports[r];
@@ -1857,8 +1861,8 @@ function refreshReportDisplay() {
         } else {
             $('#REP_Reports').html('<div class="info-message">No Reports found.</div>');
         }
-    });
 }
+
 function changeReportPeriod(period,parm) {
     switch (period) {
         case 'Yesterday':
