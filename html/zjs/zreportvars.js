@@ -22,7 +22,7 @@ function getReportVars(reportName,callback) {
                 var dataValue = cells[c];
                 
                 switch (dataName) {
-                    case 'Template':
+                    case 'template':
                         var template = hex2string(dataValue);
                         template = template.replace(/\r\n/g,'LINEBREAK');
                         template = template.replace(/"/g,'\"');

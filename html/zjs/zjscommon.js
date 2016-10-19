@@ -183,8 +183,7 @@ $(document).ready(function(){
 
 
 //    users = getReportVars('PHP Users');
-//    taskTypes = getReportVars('PHP Task Types');
-    //customReports = getReportVars('PHP Custom Reports');
+//    amcCommands = getReportVars('PHP Automation Commands');
 
     spu.getBusinessSettings();
 
@@ -1849,7 +1848,7 @@ function refreshReportDisplay() {
         if (customReports.length>0) {
             for (var r=0; r<customReports.length; r++) {
                 var rep = customReports[r];
-                if (rep["DisplayInExplorer"]=='True') {
+                if (rep["displayInExplorer"]=='True') {
                     replist += '<div id="Reports_'+rep["name"].replace(/ /g,'_')+'" class="REP_Report" isSelected="0" hasParms="'+rep["hasParms"]+'">' + rep["name"] + (rep["hasParms"]==='1' ? ' <span style="color:#55FFBB;" title="Report contains parameters which may be required to produce output.">*</span>' : '') + '</div>';
                 }
             }
