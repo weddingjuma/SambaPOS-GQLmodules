@@ -13,17 +13,16 @@ Runs in any ES5 compliant Browser.
  - Ticket Explorer
  - CHAT
  - Reports
+ - Task Editor
  - Timeclock
  - Timeclock Policies
- - Timeclock Punch Editor `*`
- - Task Editor
- 
-`*` non-functioning, work in progress
+ - Timeclock Punch Editor (non-functioning, work in progress)
 
 ### Configuration
 
  - edit the file: \zconfigs\config.js
 
-### Discussion
+### Help / Discussion (not issues)
 
  - https://forum.sambapos.com/t/sambapos-remote-client-gql-modules/
+
