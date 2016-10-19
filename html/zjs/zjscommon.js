@@ -86,7 +86,17 @@ function loadMODULE(modscreen) {
                         spu.consoleLog('POS NOT ready.  Workperiod is CLOSED.');
                         showInfoMessage('Workperiod is CLOSED.<br /><br />Click to Retry.');
                     }
-                    POS_refreshPOSDisplay();
+                    $( '#menuItems' ).html('<br /><br /><div class="info-message">Loading Module:<br /><br />[ '+hdrTitle+' ]<br /><br />... please wait ...<br /><br />'+busyWheel+'</div>');
+                    $( '#ticketCommands' ).html('<br /><br /><div class="info-message">'+busyWheel+'</div>');
+                    $( '#orders' ).html('<br /><br /><div class="info-message">'+busyWheel+'</div>');
+                    $( '#ticketRow1' ).html('<br /><br /><div class="info-message">'+busyWheel+'</div>');
+                    $( '#ticketRow2' ).html('<br /><br /><div class="info-message">'+busyWheel+'</div>');
+                    $( '#categories' ).html('<br /><br /><div class="info-message">'+busyWheel+'</div>');
+                    POS_refreshPOSDisplay(function p(data){
+                        $('#orders').empty();
+                        POS_updateTicketOrders();
+                        selectedOrderCount = 0;
+                    });
                 });
             }
             
@@ -2429,85 +2439,38 @@ function TE_displayTicketExplorerTicketinSambaPOS() {
 }
 
 
-function POS_refreshPOSDisplay() {
-//    $('#selectCustomers').html("Customer<br /><b style='color:#55FF55'>"+POS_Ticket.ticketCustomer+"</b>");
-//    $('#selectTables').html("Table<br /><b style='color:#55FF55'>"+POS_Ticket.ticketTable+"</b>");
+function POS_refreshPOSDisplay(callback) {
 
     POS_getEntitySelectors();
-    
-    
-    getReportVars('PHP Automation Commands',function amc(data){
-        var amcButtons = data;
-        
-        var btnArrayTicket = [];
-        var btnArrayOrder = [];
-        var btnArrayRow1 = [];
-        var btnArrayRow2 = [];
-        
-        // loop through Rows for Automation Command Buttons
-        for (var b=0; b<amcButtons.length; b++) {
-            // if the Button has no Header, skip it
-            if (amcButtons[b]["buttonHeader"]) {
-                var amcButton    = amcButtons[b];
-                var buttonID     = amcButton["name"].replace(/ /g, "_");
-                var buttonName   = amcButton["name"];
-                var buttonHeader = amcButton["buttonHeader"];
-                var buttonHeader = buttonHeader.replace(/\\r/g,"<br />");
-                var buttonColors = colorHexToDec(amcButton["color"]);
-                var btnBGcolor   = buttonColors["bgColor"];
-                var btnTextColor = buttonColors["txtColor"];
 
-                // build JS Button Object
-                var btnProps = {};
-                btnProps.buttonID = buttonID;
-                btnProps.buttonName = buttonName;
-                btnProps.btnBGcolor = btnBGcolor;
-                btnProps.btnTextColor = btnTextColor;
-                btnProps.buttonHeader = buttonHeader;
-
-                // add JS Button Object to applicable JS Array
-                if (amcButtons[b]["displayOnTicket"]=='True') {
-                    btnArrayTicket.push(btnProps);
-                }
-                if (amcButtons[b]["displayOnOrders"]=='True') {
-                    btnArrayOrder.push(btnProps);
-                }
-                if (amcButtons[b]["displayUnderTicket"]=='True') {
-                    btnArrayRow1.push(btnProps);
-                }
-                if (amcButtons[b]["displayUnderTicket2"]=='True') {
-                    btnArrayRow2.push(btnProps);
-                }
-            }
-        }
-        // set main JS Arrays
-        amcBtns_ticketCommands = btnArrayTicket;
-        amcBtns_orderCommands = btnArrayOrder;
-        amcBtns_ticketRow1 = btnArrayRow1;
-        amcBtns_ticketRow2 = btnArrayRow2;
-
-        POS_amcButtons('ticketCommands');
-        POS_amcButtons('orderCommands');
-        POS_amcButtons('ticketRow1');
-        POS_amcButtons('ticketRow2');
-    });
+    if (amcBtns_ticketCommands.length == 0) {
+        POS_amcButtonsGet(function but(data){
+            // render the Buttons
+            POS_amcButtonsRender('ticketCommands');
+            POS_amcButtonsRender('orderCommands');
+            POS_amcButtonsRender('ticketRow1');
+            POS_amcButtonsRender('ticketRow2');
+        });
+    } else {
+        // render the Buttons
+        POS_amcButtonsRender('ticketCommands');
+        POS_amcButtonsRender('orderCommands');
+        POS_amcButtonsRender('ticketRow1');
+        POS_amcButtonsRender('ticketRow2');
+    }
 
     $('#entityGrids').empty();
     for (var e=0;e<POS_EntityTypes.length; e++) {
         var et  = POS_EntityTypes[e];
         var ets = et.substr(0,et.length-1);
-        
+
         POS_fillEntityGrid(et);
 
         POS_Ticket[ets] = (typeof POS_Ticket[ets]==='undefined' ? '' : POS_Ticket[ets]);
-        
+
         $('#select'+et).html(ets+'<br /><b style="color:#55FF55">'+(POS_Ticket[ets]!='' ? POS_Ticket[ets] : '&nbsp;')+'</b>');
 
     }
-
-    $('#orders').empty();
-    POS_updateTicketOrders();
-    selectedOrderCount = 0;
 
     if (!POS_Menu.selectedCategoryDivId) {
         POS_getMenu(menuName, function m(menu){
@@ -2522,4 +2485,9 @@ function POS_refreshPOSDisplay() {
             $('#'+selectedCategoryDivId).click();
         });
     }
+
+    if (callback) {
+        callback(POS_Menu);
+    }
+
 }

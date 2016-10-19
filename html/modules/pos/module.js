@@ -679,7 +679,65 @@ function POS_showEntityGrid(entityType) {
     $('#'+entityType).show();
 }
 
-function POS_amcButtons(mapping) {
+function POS_amcButtonsGet(callback) {
+
+    getReportVars('PHP Automation Commands',function amc(data){
+        var amcButtons = data;
+        
+        var btnArrayTicket = [];
+        var btnArrayOrder = [];
+        var btnArrayRow1 = [];
+        var btnArrayRow2 = [];
+        
+        // loop through Rows for Automation Command Buttons
+        for (var b=0; b<amcButtons.length; b++) {
+            // if the Button has no Header, skip it
+            if (amcButtons[b]["buttonHeader"]) {
+                var amcButton    = amcButtons[b];
+                var buttonID     = amcButton["name"].replace(/ /g, "_");
+                var buttonName   = amcButton["name"];
+                var buttonHeader = amcButton["buttonHeader"];
+                var buttonHeader = buttonHeader.replace(/\\r/g,"<br />");
+                var buttonColors = colorHexToDec(amcButton["color"]);
+                var btnBGcolor   = buttonColors["bgColor"];
+                var btnTextColor = buttonColors["txtColor"];
+
+                // build JS Button Object
+                var btnProps = {};
+                btnProps.buttonID = buttonID;
+                btnProps.buttonName = buttonName;
+                btnProps.btnBGcolor = btnBGcolor;
+                btnProps.btnTextColor = btnTextColor;
+                btnProps.buttonHeader = buttonHeader;
+
+                // add JS Button Object to applicable JS Array
+                if (amcButtons[b]["displayOnTicket"]=='True') {
+                    btnArrayTicket.push(btnProps);
+                }
+                if (amcButtons[b]["displayOnOrders"]=='True') {
+                    btnArrayOrder.push(btnProps);
+                }
+                if (amcButtons[b]["displayUnderTicket"]=='True') {
+                    btnArrayRow1.push(btnProps);
+                }
+                if (amcButtons[b]["displayUnderTicket2"]=='True') {
+                    btnArrayRow2.push(btnProps);
+                }
+            }
+        }
+        // set main JS Arrays
+        amcBtns_ticketCommands = btnArrayTicket;
+        amcBtns_orderCommands = btnArrayOrder;
+        amcBtns_ticketRow1 = btnArrayRow1;
+        amcBtns_ticketRow2 = btnArrayRow2;
+        
+        if (callback) {
+            callback(amcButtons);
+        }
+    });
+}
+
+function POS_amcButtonsRender(mapping) {
     switch (mapping) {
         case 'ticketCommands':
             var amcButtons = amcBtns_ticketCommands;
@@ -697,6 +755,8 @@ function POS_amcButtons(mapping) {
             break;
     }
     
+    spu.consoleLog('Rendering POS_amcButtons ('+mapping+'): '+amcButtons.length);
+
     $('#'+mapping).empty();
     for (var b=0; b<amcButtons.length; b++) {
         var btn = amcButtons[b];
