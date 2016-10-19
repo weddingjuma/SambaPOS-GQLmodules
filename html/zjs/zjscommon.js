@@ -101,7 +101,14 @@ function loadMODULE(modscreen) {
                 setReportFilterDefaults();
             }
             if (modscreen=='reports') {
-                refreshReportDisplay();
+                if (customReports.length==0) {
+                    getReportVars('PHP Custom Reports',function rl(data){
+                        customReports = data;
+                        refreshReportDisplay();
+                    });
+                } else {
+                    refreshReportDisplay();
+                }
                 setReportFilterDefaults();
             }
             if (modscreen=='ticket_explorer') {
@@ -184,11 +191,11 @@ $(document).ready(function(){
     getReportVars('PHP Custom Reports',function rl(data){
         customReports = data;
     });
+    
     getReportVars('PHP Users',function rl(data){
         users = data;
     });
-
-//    users = getReportVars('PHP Users');
+    
 
     spu.getBusinessSettings();
 
@@ -1848,6 +1855,10 @@ function setReportFilterDefaults(callback) {
 function refreshReportDisplay() {
     $('#REP_Reports').html('<div class="info-message">Fetching Reports, please Wait...<br /><br />'+busyWheel+'</div>');
     var replist = '';
+//    getReportVars('PHP Custom Reports',function rl(data){
+//        customReports = data;
+//
+//    });
         if (customReports.length>0) {
             for (var r=0; r<customReports.length; r++) {
                 var rep = customReports[r];
@@ -1992,7 +2003,7 @@ function displayReport(report) {
             repstuff += '<div class="REPORT_row">';
 
             // this colWidth assignment overrides the above
-            // using a pre-populated array (from PHP/SQL)
+            // using a pre-populated array
             // that contains report template information
             // about the column widths, for example:
             // [ReportName:5, 3,2, 1, 1]
@@ -2005,15 +2016,14 @@ function displayReport(report) {
                 var columnHeader = report.tables[t].columns[col].header;
                     columnHeader = (columnHeader===null ? '-' : columnHeader);
                     columnHeaders.push(columnHeader);
-                //if (PHP) {
-                    var colWidth = reportColumnWidths[col] + '%';
-                //}
+                var colWidth = reportColumnWidths[col] + '%';
+                
                 repstuff += '<div id="columnHeader_'+col+'" class="REPORT_columnHeader" style="width:'+colWidth+';">' + columnHeader + '</div>';
             }
 
             repstuff += '</div>';
 
-            // this loops through a pre-populated array (from PHP/SQL)
+            // this loops through a pre-populated array
             // that contains report template information
             // to determine if a row is prefixed with > or >>
             // reportHeadersS is for >
@@ -2051,9 +2061,7 @@ function displayReport(report) {
                 // and optionally apply other formatting
                 // start the Cell loop for the row
                 for (var cell=0; cell<report.tables[t].rows[row].cells.length; cell++) {
-                    //if (PHP) {
-                        var colWidth = reportColumnWidths[cell] + '%';
-                    //}
+                    var colWidth = reportColumnWidths[cell] + '%';
                     var cellData = report.tables[t].rows[row].cells[cell];
                     var isTemplate = columnHeaders[cell]=='Template' ? true : false;
                     var isNum  = isNumericWithSep(cellData,sepThousand);
