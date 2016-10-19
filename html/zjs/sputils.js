@@ -571,6 +571,46 @@ function colourNameToHex(colour)
     return false;
 }
 
+function colorHexToDec(hexColor) {
+    if (hexColor.indexOf("#") == -1) {
+        return hexColor;
+    }
+    decA = 1;
+    hexNum = hexColor.substr(1);
+    //echo 'hexFull:'.hexNum.' ';
+    hexLen = hexNum.length;
+    alphaChan = (hexLen==8 ? hexNum.substr(0,2) : '');
+    if (alphaChan!='') {
+        hexNum = hexNum.substr(2);
+        //echo 'hexNoAlpha:'.hexNum.' ';
+        decA = parseInt(alphaChan, 16);
+        decA = decA/255;
+    }
+    hexR = hexNum.substr(0,2);
+    hexG = hexNum.substr(2,2);
+    hexB = hexNum.substr(4,2);
+    //echo 'hex'.hexR.hexG.hexB;
+    decR = parseInt(hexR, 16);
+    decG = parseInt(hexG, 16);
+    decB = parseInt(hexB, 16);
+    //echo 'dec'.decR.decG.decB;
+    
+    brightness = (decR * 299) + (decG * 587) + (decB * 114);
+    brightness = brightness / 255000;
+    // anything greater than 0.5 should be bright enough for dark text
+    if (brightness >= 0.5) {
+      textColor = "#000000";
+    } else {
+      textColor = "#FFFFFF";
+    }
+  
+    bgColor = 'rgba('+decR+','+decG+','+decB+ (alphaChan!='' ? ','+decA : '') +')';
+
+    //return array("bgColor" => bgColor, "txtColor" => textColor);
+    return {bgColor:bgColor,txtColor:textColor};
+}
+
+
 function ascii2string(asciiArray) {
   var result = "";
   var alist = asciiArray.split(',');
