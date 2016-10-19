@@ -1994,7 +1994,7 @@ function displayReport(report) {
             // about the column widths, for example:
             // [ReportName:5, 3,2, 1, 1]
             // if we want evenly-spaced columns, then 
-            // comment outthe colWidth assignment
+            // comment out the colWidth assignment
             // this loop is still required to display the column Headers
             // start the loop for report Header columns
             var columnHeaders = [];
@@ -2002,9 +2002,9 @@ function displayReport(report) {
                 var columnHeader = report.tables[t].columns[col].header;
                     columnHeader = (columnHeader===null ? '-' : columnHeader);
                     columnHeaders.push(columnHeader);
-                if (PHP) {
+                //if (PHP) {
                     var colWidth = reportColumnWidths[col] + '%';
-                }
+                //}
                 repstuff += '<div id="columnHeader_'+col+'" class="REPORT_columnHeader" style="width:'+colWidth+';">' + columnHeader + '</div>';
             }
 
@@ -2048,9 +2048,9 @@ function displayReport(report) {
                 // and optionally apply other formatting
                 // start the Cell loop for the row
                 for (var cell=0; cell<report.tables[t].rows[row].cells.length; cell++) {
-                    if (PHP) {
+                    //if (PHP) {
                         var colWidth = reportColumnWidths[cell] + '%';
-                    }
+                    //}
                     var cellData = report.tables[t].rows[row].cells[cell];
                     var isTemplate = columnHeaders[cell]=='Template' ? true : false;
                     var isNum  = isNumericWithSep(cellData,sepThousand);
