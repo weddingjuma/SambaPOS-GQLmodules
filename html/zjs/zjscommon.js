@@ -7,6 +7,14 @@ function loadMODULE(modscreen) {
     
     spu.refreshMoments();
     
+//    var users;
+//    getUsers(function u(stuff){
+//        users = stuff;
+//        spu.consoleLog(users[0].PIN);
+//    });
+//    var passhash = CryptoJS.SHA512('1234').toString();
+//    spu.consoleLog(passhash);
+    
     if (inSambaPOS) {
         // if the page is running inside SambaPOS HTML Viewer Widget
         // get rid of Top and Bottom bars
@@ -78,12 +86,11 @@ function loadMODULE(modscreen) {
                         spu.consoleLog('POS NOT ready.  Workperiod is CLOSED.');
                         showInfoMessage('Workperiod is CLOSED.<br /><br />Click to Retry.');
                     }
+                    POS_refreshPOSDisplay();
                 });
             }
             
             if (modscreen=='kitchen_display') {
-//                KD_HTMLtaskType = 'BB Bump Bar Task HTML';
-//                KD_GUItaskType = 'BB Bump Bar Task';
                 KD_refreshTaskList();
             }
             if (modscreen=='customer_display') {
@@ -94,7 +101,14 @@ function loadMODULE(modscreen) {
                 setReportFilterDefaults();
             }
             if (modscreen=='reports') {
-                refreshReportDisplay();
+                if (customReports.length==0) {
+                    getReportVars('PHP Custom Reports',function rl(data){
+                        customReports = data;
+                        refreshReportDisplay();
+                    });
+                } else {
+                    refreshReportDisplay();
+                }
                 setReportFilterDefaults();
             }
             if (modscreen=='ticket_explorer') {
@@ -169,10 +183,19 @@ $(document).ready(function(){
 
     sessionId = session_id();
     currentTerminal = navigator.sayswho;
-
+    
     if (inSambaPOS){
         spu.getEmbeddedUserTerminal();
     }
+
+    getReportVars('PHP Custom Reports',function rl(data){
+        customReports = data;
+    });
+    
+    getReportVars('PHP Users',function rl(data){
+        users = data;
+    });
+    
 
     spu.getBusinessSettings();
 
@@ -183,15 +206,28 @@ $(document).ready(function(){
     loadMODULE(module);
 
     $('#infoMessage').click(function () {
-        $('#infoMessage').hide();
-        if (!WPisOpen) {
-            loadMODULE('main_menu');
-        }
+        workperiodCheck('',function wpo(workperiod){
+            WPisOpen = workperiod.isOpen;
+            if (!workperiod.isOpen) {
+                spu.consoleLog('POS NOT ready.  Workperiod is CLOSED.');
+                navigateTo('module','main_menu','main_menu');
+                $('#infoMessage').hide();
+            } else {
+                $('#infoMessage').hide();
+            }
+        });
     });
 
-    if (WPID < 1 && module=='pos') {
-        showInfoMessage('Workperiod is CLOSED.<br /><br />Click to Retry.');
-        return;
+    if (module=='pos') {
+        workperiodCheck('',function wpo(workperiod){
+            WPisOpen = workperiod.isOpen;
+            if (!workperiod.isOpen) {
+                spu.consoleLog('POS NOT ready.  Workperiod is CLOSED.');
+                showInfoMessage('Workperiod is CLOSED.<br /><br />Click to Retry.');
+            } else {
+                $('#infoMessage').hide();
+            }
+        });
     }
     
   
@@ -425,7 +461,6 @@ $(document).ready(function(){
     clockTimer = setInterval(showTime, 500);
     //document.getElementById('clock_date').innerHTML="<b>" + thisDay + "</b>, " + day + " " + months[month] + " " + year;
     $( '#clock_date' ).html("<b>" + thisDay + "</b>, " + day + " " + months[month] + " " + year);
-
 
 });
 
@@ -1715,17 +1750,37 @@ function loadTaskTypeList(callback) {
     if (document.getElementById('TSK_TaskTypePicker')) {
         TSK_TaskTypes = [];
         var ttypesstuff = '';
-        for (var t=0; t<taskTypes.length; t++) {
-            var taskType = taskTypes[t].name;
-            TSK_TaskTypes.push(taskType);
-            ttypesstuff += '<OPTION VALUE="'+taskType+'">'+taskType+'</OPTION>';
-        }
+        getReportVars('PHP Task Types',function tt(data){
+            taskTypes = data;
+            
+            getReportVars('PHP Task Type Custom Fields',function cf(cfdata){
+                var ttcf = cfdata;
+                
+                for (var t=0; t<taskTypes.length; t++) {
+                    var taskType = taskTypes[t].name;
+                    
+                    var customFields = [];
+                    for (var c=0; c<ttcf.length; c++) {
+                        var customField = ttcf[c];
+                        if (customField.taskTypeId == taskTypes[t].id) {
+                            customFields.push({name:customField.name,fieldType:customField.fieldType,displayFormat:customField.displayFormat,editingFormat:customField.editingFomat});
+                        }
+                    }
+                    taskTypes[t].customFields = customFields;
+                    
+                    TSK_TaskTypes.push(taskType);
+                    ttypesstuff += '<OPTION VALUE="'+taskType+'">'+taskType+'</OPTION>';
+                }
 
-        $('#TSK_TaskTypePicker').empty();
-        $('#TSK_TaskTypePicker').append(ttypesstuff);
-    }
-    if (callback) {
-        callback();
+                $('#TSK_TaskTypePicker').empty();
+                $('#TSK_TaskTypePicker').append(ttypesstuff);
+                
+                if (callback) {
+                    callback(taskTypes);
+                }
+            });
+            
+        });
     }
 }
 function refreshTaskEditorDisplay(taskType,isCompleted,callback) {
@@ -1800,18 +1855,25 @@ function setReportFilterDefaults(callback) {
 function refreshReportDisplay() {
     $('#REP_Reports').html('<div class="info-message">Fetching Reports, please Wait...<br /><br />'+busyWheel+'</div>');
     var replist = '';
-    if (customReports.length>0) {
-        for (var r=0; r<customReports.length; r++) {
-            var rep = customReports[r];
-            replist += '<div id="Reports_'+rep["name"].replace(/ /g,'_')+'" class="REP_Report" isSelected="0" hasParms="'+rep["hasParms"]+'">' + rep["name"] + (rep["hasParms"]==='1' ? ' <span style="color:#55FFBB;" title="Report contains parameters which may be required to produce output.">*</span>' : '') + '</div>';
+//    getReportVars('PHP Custom Reports',function rl(data){
+//        customReports = data;
+//
+//    });
+        if (customReports.length>0) {
+            for (var r=0; r<customReports.length; r++) {
+                var rep = customReports[r];
+                if (rep["displayInExplorer"]=='True') {
+                    replist += '<div id="Reports_'+rep["name"].replace(/ /g,'_')+'" class="REP_Report" isSelected="0" hasParms="'+rep["hasParms"]+'">' + rep["name"] + (rep["hasParms"]==='1' ? ' <span style="color:#55FFBB;" title="Report contains parameters which may be required to produce output.">*</span>' : '') + '</div>';
+                }
+            }
+            $('#REP_Reports').empty();
+            $('#REP_Reports').append(replist);
+            $('#REP_Reports').append('<div style="height:80px;"> </div>');
+        } else {
+            $('#REP_Reports').html('<div class="info-message">No Reports found.</div>');
         }
-        $('#REP_Reports').empty();
-        $('#REP_Reports').append(replist);
-        $('#REP_Reports').append('<div style="height:80px;"> </div>');
-    } else {
-        $('#REP_Reports').html('<div class="info-message">No Reports found.</div>');
-    }
 }
+
 function changeReportPeriod(period,parm) {
     switch (period) {
         case 'Yesterday':
@@ -1941,26 +2003,27 @@ function displayReport(report) {
             repstuff += '<div class="REPORT_row">';
 
             // this colWidth assignment overrides the above
-            // using a pre-populated array (from PHP/SQL)
+            // using a pre-populated array
             // that contains report template information
             // about the column widths, for example:
             // [ReportName:5, 3,2, 1, 1]
             // if we want evenly-spaced columns, then 
-            // comment outthe colWidth assignment
+            // comment out the colWidth assignment
             // this loop is still required to display the column Headers
             // start the loop for report Header columns
+            var columnHeaders = [];
             for (var col=0; col<report.tables[t].columns.length; col++) {
                 var columnHeader = report.tables[t].columns[col].header;
                     columnHeader = (columnHeader===null ? '-' : columnHeader);
-                if (PHP) {
-                    var colWidth = reportColumnWidths[col] + '%';
-                }
+                    columnHeaders.push(columnHeader);
+                var colWidth = reportColumnWidths[col] + '%';
+                
                 repstuff += '<div id="columnHeader_'+col+'" class="REPORT_columnHeader" style="width:'+colWidth+';">' + columnHeader + '</div>';
             }
 
             repstuff += '</div>';
 
-            // this loops through a pre-populated array (from PHP/SQL)
+            // this loops through a pre-populated array
             // that contains report template information
             // to determine if a row is prefixed with > or >>
             // reportHeadersS is for >
@@ -1998,10 +2061,9 @@ function displayReport(report) {
                 // and optionally apply other formatting
                 // start the Cell loop for the row
                 for (var cell=0; cell<report.tables[t].rows[row].cells.length; cell++) {
-                    if (PHP) {
-                        var colWidth = reportColumnWidths[cell] + '%';
-                    }
+                    var colWidth = reportColumnWidths[cell] + '%';
                     var cellData = report.tables[t].rows[row].cells[cell];
+                    var isTemplate = columnHeaders[cell]=='Template' ? true : false;
                     var isNum  = isNumericWithSep(cellData,sepThousand);
                     var isPerc = isPercent(cellData);
                     var isDT   = isDate(cellData);
@@ -2020,6 +2082,7 @@ function displayReport(report) {
 //                        DT = (isDT && !isNum ? formatDateTime(DT,false,false).substr(0,10) : false);
                     var DT = (isDT ? moment(cellData,dateFormats).format("YYYY-MM-DD HH:mm:ss") : false);
                     cellData = (isDT && !isNum ? DT : cellData);
+                    cellData = (isTemplate ? hex2string(cellData) : cellData);
                     
                     repstuff += '<div id="cell_'+row+'_'+cell+'" class="REPORT_cell" style="width:'+colWidth+';text-align:'+textAlign+';">' + cellData + '</div>';
                 } // cell loop
@@ -2362,5 +2425,101 @@ function TE_displayTicketExplorerTicketinSambaPOS() {
         var name = 'HUB Display Ticket in SambaPOS';
         var value = $('#TicketExplorerTicket').attr('ticketId');
         spu.executeAutomationCommand(name,value);
+    }
+}
+
+
+function POS_refreshPOSDisplay() {
+//    $('#selectCustomers').html("Customer<br /><b style='color:#55FF55'>"+POS_Ticket.ticketCustomer+"</b>");
+//    $('#selectTables').html("Table<br /><b style='color:#55FF55'>"+POS_Ticket.ticketTable+"</b>");
+
+    POS_getEntitySelectors();
+    
+    
+    getReportVars('PHP Automation Commands',function amc(data){
+        var amcButtons = data;
+        
+        var btnArrayTicket = [];
+        var btnArrayOrder = [];
+        var btnArrayRow1 = [];
+        var btnArrayRow2 = [];
+        
+        // loop through Rows for Automation Command Buttons
+        for (var b=0; b<amcButtons.length; b++) {
+            // if the Button has no Header, skip it
+            if (amcButtons[b]["buttonHeader"]) {
+                var amcButton    = amcButtons[b];
+                var buttonID     = amcButton["name"].replace(/ /g, "_");
+                var buttonName   = amcButton["name"];
+                var buttonHeader = amcButton["buttonHeader"];
+                var buttonHeader = buttonHeader.replace(/\\r/g,"<br />");
+                var buttonColors = colorHexToDec(amcButton["color"]);
+                var btnBGcolor   = buttonColors["bgColor"];
+                var btnTextColor = buttonColors["txtColor"];
+
+                // build JS Button Object
+                var btnProps = {};
+                btnProps.buttonID = buttonID;
+                btnProps.buttonName = buttonName;
+                btnProps.btnBGcolor = btnBGcolor;
+                btnProps.btnTextColor = btnTextColor;
+                btnProps.buttonHeader = buttonHeader;
+
+                // add JS Button Object to applicable JS Array
+                if (amcButtons[b]["displayOnTicket"]=='True') {
+                    btnArrayTicket.push(btnProps);
+                }
+                if (amcButtons[b]["displayOnOrders"]=='True') {
+                    btnArrayOrder.push(btnProps);
+                }
+                if (amcButtons[b]["displayUnderTicket"]=='True') {
+                    btnArrayRow1.push(btnProps);
+                }
+                if (amcButtons[b]["displayUnderTicket2"]=='True') {
+                    btnArrayRow2.push(btnProps);
+                }
+            }
+        }
+        // set main JS Arrays
+        amcBtns_ticketCommands = btnArrayTicket;
+        amcBtns_orderCommands = btnArrayOrder;
+        amcBtns_ticketRow1 = btnArrayRow1;
+        amcBtns_ticketRow2 = btnArrayRow2;
+
+        POS_amcButtons('ticketCommands');
+        POS_amcButtons('orderCommands');
+        POS_amcButtons('ticketRow1');
+        POS_amcButtons('ticketRow2');
+    });
+
+    $('#entityGrids').empty();
+    for (var e=0;e<POS_EntityTypes.length; e++) {
+        var et  = POS_EntityTypes[e];
+        var ets = et.substr(0,et.length-1);
+        
+        POS_fillEntityGrid(et);
+
+        POS_Ticket[ets] = (typeof POS_Ticket[ets]==='undefined' ? '' : POS_Ticket[ets]);
+        
+        $('#select'+et).html(ets+'<br /><b style="color:#55FF55">'+(POS_Ticket[ets]!='' ? POS_Ticket[ets] : '&nbsp;')+'</b>');
+
+    }
+
+    $('#orders').empty();
+    POS_updateTicketOrders();
+    selectedOrderCount = 0;
+
+    if (!POS_Menu.selectedCategoryDivId) {
+        POS_getMenu(menuName, function m(menu){
+            POS_Menu = menu;
+            POS_getCategories(POS_Menu, function c(selectedCategoryDivId){
+                $('#'+selectedCategoryDivId).click();
+            });
+        });
+    } else {
+        POS_getCategories(POS_Menu, function c(selectedCategoryDivId){
+            document.getElementById(selectedCategoryDivId).click();
+            $('#'+selectedCategoryDivId).click();
+        });
     }
 }
