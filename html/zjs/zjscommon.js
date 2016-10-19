@@ -7,6 +7,14 @@ function loadMODULE(modscreen) {
     
     spu.refreshMoments();
     
+//    var users;
+//    getUsers(function u(stuff){
+//        users = stuff;
+//        spu.consoleLog(users[0].PIN);
+//    });
+//    var passhash = CryptoJS.SHA512('1234').toString();
+//    spu.consoleLog(passhash);
+    
     if (inSambaPOS) {
         // if the page is running inside SambaPOS HTML Viewer Widget
         // get rid of Top and Bottom bars
@@ -168,10 +176,15 @@ $(document).ready(function(){
 
     sessionId = session_id();
     currentTerminal = navigator.sayswho;
-
+    
     if (inSambaPOS){
         spu.getEmbeddedUserTerminal();
     }
+
+
+//    users = getReportVars('PHP Users');
+//    taskTypes = getReportVars('PHP Task Types');
+    //customReports = getReportVars('PHP Custom Reports');
 
     spu.getBusinessSettings();
 
@@ -437,7 +450,6 @@ $(document).ready(function(){
     clockTimer = setInterval(showTime, 500);
     //document.getElementById('clock_date').innerHTML="<b>" + thisDay + "</b>, " + day + " " + months[month] + " " + year;
     $( '#clock_date' ).html("<b>" + thisDay + "</b>, " + day + " " + months[month] + " " + year);
-
 
 });
 
@@ -1727,17 +1739,37 @@ function loadTaskTypeList(callback) {
     if (document.getElementById('TSK_TaskTypePicker')) {
         TSK_TaskTypes = [];
         var ttypesstuff = '';
-        for (var t=0; t<taskTypes.length; t++) {
-            var taskType = taskTypes[t].name;
-            TSK_TaskTypes.push(taskType);
-            ttypesstuff += '<OPTION VALUE="'+taskType+'">'+taskType+'</OPTION>';
-        }
+        getReportVars('PHP Task Types',function tt(data){
+            taskTypes = data;
+            
+            getReportVars('PHP Task Type Custom Fields',function cf(cfdata){
+                var ttcf = cfdata;
+                
+                for (var t=0; t<taskTypes.length; t++) {
+                    var taskType = taskTypes[t].name;
+                    
+                    var customFields = [];
+                    for (var c=0; c<ttcf.length; c++) {
+                        var customField = ttcf[c];
+                        if (customField.taskTypeId == taskTypes[t].id) {
+                            customFields.push({name:customField.name,fieldType:customField.fieldType,displayFormat:customField.displayFormat,editingFormat:customField.editingFomat});
+                        }
+                    }
+                    taskTypes[t].customFields = customFields;
+                    
+                    TSK_TaskTypes.push(taskType);
+                    ttypesstuff += '<OPTION VALUE="'+taskType+'">'+taskType+'</OPTION>';
+                }
 
-        $('#TSK_TaskTypePicker').empty();
-        $('#TSK_TaskTypePicker').append(ttypesstuff);
-    }
-    if (callback) {
-        callback();
+                $('#TSK_TaskTypePicker').empty();
+                $('#TSK_TaskTypePicker').append(ttypesstuff);
+                
+                if (callback) {
+                    callback(taskTypes);
+                }
+            });
+            
+        });
     }
 }
 function refreshTaskEditorDisplay(taskType,isCompleted,callback) {
@@ -1812,17 +1844,22 @@ function setReportFilterDefaults(callback) {
 function refreshReportDisplay() {
     $('#REP_Reports').html('<div class="info-message">Fetching Reports, please Wait...<br /><br />'+busyWheel+'</div>');
     var replist = '';
-    if (customReports.length>0) {
-        for (var r=0; r<customReports.length; r++) {
-            var rep = customReports[r];
-            replist += '<div id="Reports_'+rep["name"].replace(/ /g,'_')+'" class="REP_Report" isSelected="0" hasParms="'+rep["hasParms"]+'">' + rep["name"] + (rep["hasParms"]==='1' ? ' <span style="color:#55FFBB;" title="Report contains parameters which may be required to produce output.">*</span>' : '') + '</div>';
+    getReportVars('PHP Custom Reports',function rl(data){
+        customReports = data;
+        if (customReports.length>0) {
+            for (var r=0; r<customReports.length; r++) {
+                var rep = customReports[r];
+                if (rep["DisplayInExplorer"]=='True') {
+                    replist += '<div id="Reports_'+rep["name"].replace(/ /g,'_')+'" class="REP_Report" isSelected="0" hasParms="'+rep["hasParms"]+'">' + rep["name"] + (rep["hasParms"]==='1' ? ' <span style="color:#55FFBB;" title="Report contains parameters which may be required to produce output.">*</span>' : '') + '</div>';
+                }
+            }
+            $('#REP_Reports').empty();
+            $('#REP_Reports').append(replist);
+            $('#REP_Reports').append('<div style="height:80px;"> </div>');
+        } else {
+            $('#REP_Reports').html('<div class="info-message">No Reports found.</div>');
         }
-        $('#REP_Reports').empty();
-        $('#REP_Reports').append(replist);
-        $('#REP_Reports').append('<div style="height:80px;"> </div>');
-    } else {
-        $('#REP_Reports').html('<div class="info-message">No Reports found.</div>');
-    }
+    });
 }
 function changeReportPeriod(period,parm) {
     switch (period) {
@@ -1961,9 +1998,11 @@ function displayReport(report) {
             // comment outthe colWidth assignment
             // this loop is still required to display the column Headers
             // start the loop for report Header columns
+            var columnHeaders = [];
             for (var col=0; col<report.tables[t].columns.length; col++) {
                 var columnHeader = report.tables[t].columns[col].header;
                     columnHeader = (columnHeader===null ? '-' : columnHeader);
+                    columnHeaders.push(columnHeader);
                 if (PHP) {
                     var colWidth = reportColumnWidths[col] + '%';
                 }
@@ -2014,6 +2053,7 @@ function displayReport(report) {
                         var colWidth = reportColumnWidths[cell] + '%';
                     }
                     var cellData = report.tables[t].rows[row].cells[cell];
+                    var isTemplate = columnHeaders[cell]=='Template' ? true : false;
                     var isNum  = isNumericWithSep(cellData,sepThousand);
                     var isPerc = isPercent(cellData);
                     var isDT   = isDate(cellData);
@@ -2032,6 +2072,7 @@ function displayReport(report) {
 //                        DT = (isDT && !isNum ? formatDateTime(DT,false,false).substr(0,10) : false);
                     var DT = (isDT ? moment(cellData,dateFormats).format("YYYY-MM-DD HH:mm:ss") : false);
                     cellData = (isDT && !isNum ? DT : cellData);
+                    cellData = (isTemplate ? hex2string(cellData) : cellData);
                     
                     repstuff += '<div id="cell_'+row+'_'+cell+'" class="REPORT_cell" style="width:'+colWidth+';text-align:'+textAlign+';">' + cellData + '</div>';
                 } // cell loop
