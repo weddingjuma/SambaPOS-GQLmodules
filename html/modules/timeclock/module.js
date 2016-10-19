@@ -101,7 +101,7 @@ $('#TC_EntityCommands').on('click', '.TC_EntityCommand', function(){
         //$('#TC_Entities').html('<div class="info-message">Updating Entities, please Wait...<br /><br />'+busyWheel+'</div>');
         $('#TC_EntityCommands').hide();
         updateEmployeePunchState(selEnt,cmdButton, function refresh() {
-            refreshTimeclockDisplay(TC_EntityType,TC_EntitySearch, function sel() {
+            TC_refreshTimeclockDisplay(TC_EntityType,TC_EntitySearch, function sel() {
                 document.getElementById(selEnt).click();
                 document.getElementById(selEnt).style.borderColor = '#FFBB00';
                 $('#TC_EntityCommands').show();

@@ -163,6 +163,35 @@ spu.executeAutomationCommand = function(name,value) {
     window.external.ExecuteAutomationCommand(name,value);
 };
 
+function getUsers(callback) {
+    var users = [];
+    //getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters,function currentWP(report) {
+    getCustomReport('PHP Users','Admin','','','','',function r(report){
+        for (var t=0; t<report.tables.length; t++) {
+            var cName = [];
+            for (var col=0; col<report.tables[t].columns.length; col++) {
+                var columnHeader = report.tables[t].columns[col].header;
+                    columnHeader = (columnHeader===null ? '-' : columnHeader);
+                    cName.push(columnHeader);
+            }
+            for (var row=0; row<report.tables[t].rows.length; row++) {
+                var userData = {};
+                for (var cell=0; cell<report.tables[t].rows[row].cells.length; cell++) {
+                    var cellData = report.tables[t].rows[row].cells[cell];
+                    userData[cName[cell]]=cellData;
+                }
+                //userData = userData.substr(0,(userData.length-1));
+                users.push(userData);
+            }
+        }
+        if (callback) {
+            callback(users);
+        }
+
+    });
+    //return users;
+};
+
 function session_id() {
     return /SESS\w*ID=([^;]+)/i.test(document.cookie) ? RegExp.$1 : false;
 }
@@ -540,4 +569,25 @@ function colourNameToHex(colour)
         return colours[colour.toLowerCase()];
 
     return false;
+}
+
+function ascii2string(asciiArray) {
+  var result = "";
+  var alist = asciiArray.split(',');
+  for (var i = 1; i < alist.length; i++) {
+    result += String.fromCharCode(parseInt(alist[i]));
+  }
+  return result;
+}
+
+function hex2string(instr) {
+    var hex = instr.toString();
+    var str = '';
+    for (var n = 0; n < hex.length; n += 4) {
+        var chunk = hex.substr(n, 2);
+        var anInt = parseInt(chunk, 16);
+        var char  = String.fromCharCode(anInt);
+        str += String.fromCharCode(anInt);
+    }
+    return str;
 }

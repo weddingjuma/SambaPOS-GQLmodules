@@ -2,6 +2,8 @@
 GLOBAL VARS
 */
 
+var users;
+
 var sessionId;
 
 var isConnected = false;
