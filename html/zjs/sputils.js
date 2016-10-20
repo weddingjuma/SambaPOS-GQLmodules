@@ -228,7 +228,7 @@ spu.validateUser = function (user, pin, callback) {
 
                 if (!currentUserData.validated || !currentUserData.name || !currentUserData.PIN || currentUserData.PIN == '') {
                     spu.consoleLog('Prompting User for PIN ...');
-                    var pin = prompt("Enter PIN:");
+                    var pin = prompt("Enter PIN:",'');
                     var pinhash  = CryptoJS.SHA512(pin).toString().toUpperCase();
 
                     for (var u=0; u<users.length; u++) {
@@ -727,8 +727,31 @@ function hex2string(instr) {
 
 function getClientIP(callback) {
     spu.consoleLog('Getting Client IP ...');
+    $.get(webUrl+"/zjs/lib/ipinfo.php", function(data){
+        spu.consoleLog('UTIL:'+data);
+        var d = JSON.parse(data);
+        spu.consoleLog('UTILra:'+d.ra);
+        spu.consoleLog('UTIL4:'+d.v4);
+        spu.consoleLog('UTIL6:'+d.v6);
+        if (callback) {
+            callback(d.v4);
+        }
+    });
     
-    if (!isiDevice) {
+    if (isiDevice || navigator.sayswho.indexOf('IE ') > -1) {
+        
+        spu.consoleLog('getClientIP using Method: Server Call');
+
+        $.getJSON('//freegeoip.net/json/?callback=?', function(data) {
+            clientIP = data.ip;
+            //spu.consoleLog('CLIENT IP:' +clientIP);
+            if (callback) {
+                callback(data.ip);
+            }
+            return data.ip;
+        });
+    
+    } else {
         
         spu.consoleLog('getClientIP using Method: WebRTC');
         
@@ -750,19 +773,5 @@ function getClientIP(callback) {
             
             return myIP;
         };
-    
-    } else {
-        
-        spu.consoleLog('getClientIP using Method: Server Call');
-
-        $.getJSON('//freegeoip.net/json/?callback=?', function(data) {
-            clientIP = data.ip;
-            //spu.consoleLog('CLIENT IP:' +clientIP);
-            if (callback) {
-                callback(data.ip);
-            }
-            return data.ip;
-        });
-        
     }
 }
