@@ -194,8 +194,9 @@ $(document).ready(function(){
         customReports = data;
     });
     
-
-    logoutUser();
+    $('#USER_Auth').show();
+    
+    //logoutUser();
 
     spu.getBusinessSettings();
 
@@ -461,6 +462,9 @@ $(document).ready(function(){
     clockTimer = setInterval(showTime, 500);
     //document.getElementById('clock_date').innerHTML="<b>" + thisDay + "</b>, " + day + " " + months[month] + " " + year;
     $( '#clock_date' ).html("<b>" + thisDay + "</b>, " + day + " " + months[month] + " " + year);
+
+
+    logoutUser();
 
 });
 

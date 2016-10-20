@@ -35,11 +35,13 @@ gql.EXEC = function (query, callback) {
             }
         }
     })
-            .done(
-            function(response){
-                var payload = JSON.stringify(response.data);
-                countTrafficBytes(payload,'gql','rcvd');
-            }).then(callback);
+            .done(callback
+            ).then(
+                function(response){
+                    var payload = JSON.stringify(response.data);
+                    countTrafficBytes(payload,'gql','rcvd');
+                }
+            );
 };
 
 gql.getLocalSetting = function(settingName) {

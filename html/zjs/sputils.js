@@ -200,6 +200,8 @@ spu.validateUser = function (user, pin, callback) {
     
     if (bypassAllAuth) {
         spu.consoleLog('ALL USER AUTHENTICATION IS BYPASSED.');
+        currentUser = defaultUser;
+        $('#USER_Auth').hide();
         if (callback) {
             callback();
         }
@@ -208,10 +210,11 @@ spu.validateUser = function (user, pin, callback) {
     
     var bypassMatch = false;
     
-    if (allowAuthBypass) {
+    if (allowAuthBypass && !bypassAllAuth) {
         
-        $.getJSON('//freegeoip.net/json/?callback=?', function(data) {
-            clientIP = data.ip;
+        getClientIP(function(data) {
+            
+            clientIP = data;
             spu.consoleLog('CLIENT IP:' +clientIP);
             
             for (var i=0; i<bypassIPs.length; i++) {
@@ -224,9 +227,9 @@ spu.validateUser = function (user, pin, callback) {
             if (!bypassMatch) {
 
                 if (!currentUserData.validated || !currentUserData.name || !currentUserData.PIN || currentUserData.PIN == '') {
+                    spu.consoleLog('Prompting User for PIN ...');
                     var pin = prompt("Enter PIN:");
                     var pinhash  = CryptoJS.SHA512(pin).toString().toUpperCase();
-                    //spu.consoleLog('Supplied Hash: '+pinhash);
 
                     for (var u=0; u<users.length; u++) {
                         var passhash = users[u].PIN.toUpperCase();
@@ -234,8 +237,9 @@ spu.validateUser = function (user, pin, callback) {
                         if (pinhash == passhash) {
                             currentUserData = users[u];
                             currentUserData.validated = true;
-                            //currentUser = currentUserData.name;
+                            currentUser = currentUserData.name;
                             spu.consoleLog('User Validated: '+currentUserData.name);
+                            $('#USER_Auth').hide();
                             break;
                         }
                     }
@@ -248,6 +252,7 @@ spu.validateUser = function (user, pin, callback) {
 
             } else {
                 spu.consoleLog('User Validation Bypass for: ' + bypassIPs[i]);
+                $('#USER_Auth').hide();
             }
 
             if (callback) {
@@ -261,12 +266,13 @@ spu.validateUser = function (user, pin, callback) {
 };
 
 function logoutUser () {
+    spu.consoleLog('Logging out user...');
     currentUserData = {};
     currentUserData.name = 'unknownUser';
     currentUserData.PIN = '';
     currentUserData.validated = false;
     
-    //currentUser = currentUserData.name;
+    currentUser = defaultUser;
 
     spu.getUsers(function u(data){
         users = data;
@@ -277,10 +283,6 @@ function logoutUser () {
     });
 }
 
-$.getJSON('//freegeoip.net/json/?callback=?', function(data) {
-    clientIP = data.ip;
-    spu.consoleLog('CLIENT IP:' +clientIP);
-});
 
 function session_id() {
     return /SESS\w*ID=([^;]+)/i.test(document.cookie) ? RegExp.$1 : false;
@@ -719,4 +721,48 @@ function hex2string(instr) {
         str += String.fromCharCode(anInt);
     }
     return str;
+}
+
+
+
+function getClientIP(callback) {
+    spu.consoleLog('Getting Client IP ...');
+    
+    if (!isiDevice) {
+        
+        spu.consoleLog('getClientIP using Method: WebRTC');
+        
+        window.RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;   //compatibility for firefox and chrome
+        var pc = new RTCPeerConnection({iceServers:[]}), noop = function(){};      
+        pc.createDataChannel("");    //create a bogus data channel
+        pc.createOffer(pc.setLocalDescription.bind(pc), noop);    // create offer and set local description
+        pc.onicecandidate = function(ice){  //listen for candidate events
+            if(!ice || !ice.candidate || !ice.candidate.candidate)  return;
+            var myIP = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/.exec(ice.candidate.candidate)[1];
+            //console.log('my IP: ', myIP);
+            pc.onicecandidate = noop;
+            
+            clientIP = myIP;
+            
+            if (callback) {
+                callback(myIP);
+            }
+            
+            return myIP;
+        };
+    
+    } else {
+        
+        spu.consoleLog('getClientIP using Method: Server Call');
+
+        $.getJSON('//freegeoip.net/json/?callback=?', function(data) {
+            clientIP = data.ip;
+            //spu.consoleLog('CLIENT IP:' +clientIP);
+            if (callback) {
+                callback(data.ip);
+            }
+            return data.ip;
+        });
+        
+    }
 }
