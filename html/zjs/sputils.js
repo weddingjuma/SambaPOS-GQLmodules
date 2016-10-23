@@ -1,3 +1,9 @@
+////////////////////////////////
+//
+// sputils
+//
+////////////////////////////////
+
 // define SambaPOS Utils Object
 var spu = {};
 
@@ -163,44 +169,219 @@ spu.executeAutomationCommand = function(name,value) {
     window.external.ExecuteAutomationCommand(name,value);
 };
 
-function getUsers(callback) {
-    var users = [];
-    //getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters,function currentWP(report) {
-    getCustomReport('PHP Users','Admin','','','','',function r(report){
-        for (var t=0; t<report.tables.length; t++) {
-            var cName = [];
-            for (var col=0; col<report.tables[t].columns.length; col++) {
-                var columnHeader = report.tables[t].columns[col].header;
-                    columnHeader = (columnHeader===null ? '-' : columnHeader);
-                    cName.push(columnHeader);
-            }
-            for (var row=0; row<report.tables[t].rows.length; row++) {
-                var userData = {};
-                for (var cell=0; cell<report.tables[t].rows[row].cells.length; cell++) {
-                    var cellData = report.tables[t].rows[row].cells[cell];
-                    userData[cName[cell]]=cellData;
-                }
-                //userData = userData.substr(0,(userData.length-1));
-                users.push(userData);
-            }
-        }
+spu.getUsers = function (callback) {
+    spu.consoleLog('Getting Users...');
+    users = [];
+    getReportVars('GQLM Users',function u(data){
+        users = data;
         if (callback) {
             callback(users);
         }
-
     });
-    //return users;
 };
 
-function session_id() {
+spu.validateUser = function (user, pin, callback) {
+    spu.consoleLog('Validating User ...');
+    
+    if (bypassAllAuth) {
+        spu.consoleLog('ALL USER AUTHENTICATION IS BYPASSED.');
+        currentUser = defaultUser;
+        $('#USER_Auth').hide();
+        if (callback) {
+            callback();
+        }
+        return;
+    }
+    
+    var bypassMatch = false;
+    
+    if (allowAuthBypass && !bypassAllAuth) {
+        
+        getClientIP(function(data) {
+            
+            clientIP = data;
+            spu.consoleLog('CLIENT IP:' +clientIP);
+            
+            for (var i=0; i<bypassIPs.length; i++) {
+                if (clientIP == bypassIPs[i]) {
+                    bypassMatch = (allowAuthBypass ? true : false);
+                    break;
+                }
+            }
+
+            if (!bypassMatch) {
+                
+                //$('#numpad').append('<div class="info-message">Validating, please Wait...<br /><br />'+busyWheel+'</div>');
+
+                spu.getUsers(function u(data){
+                    users = data;
+
+                    if (!currentUserData.validated || !currentUserData.name || !currentUserData.PIN || currentUserData.PIN == '') {
+//                        spu.consoleLog('Prompting User for PIN ...');
+//                        var pin = prompt("Enter PIN:",'');
+                        
+                        var pincookie = clientSetting('phash','','get');
+                        var pin = document.getElementById('USER_inPIN').value;
+                        var pinhash  = (pincookie!='' ? pincookie : CryptoJS.SHA512(pin).toString().toUpperCase());
+                        document.getElementById('USER_inPIN').value = '';
+
+                        for (var u=0; u<users.length; u++) {
+                            var passhash = users[u].PIN.toUpperCase();
+                            //spu.consoleLog('Checking against Hash: '+passhash);
+                            if (pinhash == passhash) {
+                                currentUserData = users[u];
+                                currentUserData.validated = true;
+                                currentUser = currentUserData.name;
+                                $('#currentUser').html('['+currentTerminal+'] '+currentUser);
+                                spu.consoleLog('User Validated: '+currentUserData.name);
+                                clientSetting('userName',currentUserData.name,'set');
+                                clientSetting('phash',pinhash,'set');
+                                $('#USER_Auth').hide();
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!currentUserData.validated) {
+                        spu.consoleLog('User Validation FAILED!');
+                        logoutUser();
+                    }
+                    
+                    if (callback) {
+                        callback(currentUserData);
+                    }
+                });
+
+            } else {
+                spu.consoleLog('User Validation Bypass for: ' + bypassIPs[i]);
+                $('#USER_Auth').hide();
+            }
+
+            if (callback) {
+                callback(currentUserData);
+            }
+
+        });
+
+    }
+    
+};
+
+function logoutUser (validate) {
+    spu.consoleLog('Logging out user...');
+    
+    clientSetting('userName','','del');
+    clientSetting('phash','','del');
+    
+    $('#USER_Auth').show();
+    document.getElementById('USER_inPIN').value = '';
+    document.getElementById('USER_inPIN').focus();
+    
+    currentUserData = {};
+    currentUserData.name = 'unknownUser';
+    currentUserData.PIN = '';
+    currentUserData.validated = false;
+    
+    currentUser = defaultUser;
+    $('#currentUser').html('['+currentTerminal+'] '+currentUser);
+
+    if (validate) {
+        spu.validateUser();
+    }
+    
+//    spu.getUsers(function u(data){
+//        users = data;
+
+//        spu.validateUser('','',function v(vdata){
+//            var user = vdata;
+//            spu.consoleLog(user.name+(user.validated ? '' : ' NOT')+' validated.');
+//        });
+        
+//    });
+}
+
+
+function session_id_old() {
     return /SESS\w*ID=([^;]+)/i.test(document.cookie) ? RegExp.$1 : false;
+}
+function session_id(){
+    return clientSetting('SESSIONID',randomString(32,'aA#'),'get');
+}
+function randomString(length, chars) {
+    var mask = '';
+    if (chars.indexOf('a') > -1) mask += 'abcdefghijklmnopqrstuvwxyz';
+    if (chars.indexOf('A') > -1) mask += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    if (chars.indexOf('#') > -1) mask += '0123456789';
+    if (chars.indexOf('!') > -1) mask += '~`!@#$%^&*()_+-={}[]:";\'<>?,./|\\';
+    var result = '';
+    for (var i = length; i > 0; --i) result += mask[Math.floor(Math.random() * mask.length)];
+    return result;
 }
 
 function updatePageTitle(modscreen) {
     var currentTitle = $(document).prop('title');
     var sepPos = currentTitle.indexOf(' ~ ') + 3;
-    var newTitle = modscreen.replace(/_/,' ').toUpperCase() + ' ~ ' + currentTitle.substr(sepPos,currentTitle.length-sepPos);
+    var newTitle = modscreen.replace(/_/g,' ').toUpperCase() + ' ~ ' + currentTitle.substr(sepPos,currentTitle.length-sepPos);
     $(document).prop('title',newTitle);
+}
+
+function getReportVars(reportName,callback) {
+    spu.consoleLog('Getting ReportVars ['+reportName+']...');
+    
+    var dataArray = [];
+    
+    //                           reportName,user,dateFilter,startDate,endDate,parameters
+    gql.EXEC(gql.getCustomReport(reportName,currentUser), function rep(report){
+        
+        var report = report.data.report;
+        var table = report.tables[0];
+        var columns = table.columns;
+        
+        var rows = table.rows;
+        var rowCount = rows.length;
+        
+        for (var r=0; r<rowCount; r++) {
+            var row = rows[r];
+            var cells = row.cells;
+            var cellCount = cells.length;
+            var dataRow = {};
+            for (var c=0; c<cellCount; c++) {
+                var dataName = columns[c].header;
+                var dataValue = cells[c];
+                
+                switch (dataName) {
+                    case 'template':
+                        var template = hex2string(dataValue);
+                        template = template.replace(/\r\n/g,'LINEBREAK');
+                        template = template.replace(/"/g,'\"');
+                        // get columnCount and ColWidths
+                        var headBeg = template.indexOf('[');
+                        var headEnd = template.indexOf(']');
+                        var head = template.substring(headBeg,headEnd+1);
+                        var colStart = head.indexOf(':');
+                        var cols = head.substr(colStart+1,(head.length-colStart-2));
+                        var hasParms = (template.indexOf('$') > -1 ? '1' : '0');
+                        dataRow.hasParms = hasParms;
+                        dataRow.head = head;
+                        dataRow.cols = cols;
+                        dataRow.template = template;
+                        break;
+                    default:
+                        dataRow[dataName] = dataValue;
+                        break;
+                }
+            }
+
+            dataArray.push(dataRow);
+        }
+        
+        spu.consoleLog('Got ReportVars ['+reportName+']: ' + dataArray.length);
+        
+        if (callback) {
+            callback(dataArray);
+        }
+    });
+    
 }
 
 navigator.sayswho= (function(){
@@ -629,4 +810,189 @@ function hex2string(instr) {
         str += String.fromCharCode(anInt);
     }
     return str;
+}
+
+function enterdigit(but,el) {
+    if(document.getElementById(el)) {
+        var fieldval=document.getElementById(el).value;
+        if (but=='back') {
+            fieldval=fieldval.substr(0,fieldval.length-1);
+        } else if (but=='clear') {
+            fieldval='';
+        } else {
+            fieldval+=but;
+        }
+        
+        document.getElementById(el).value = fieldval;
+    }
+}
+
+function getClientIP(callback) {
+    spu.consoleLog('Getting Client IP ...');
+    
+    if (PHP) {
+        
+        spu.consoleLog('getClientIP Method: Server Call (local)');
+        
+        $.get(webUrl+"/zjs/lib/ipinfo.php", function(data){
+            spu.consoleLog('UTIL:'+data);
+            var d = JSON.parse(data);
+            spu.consoleLog('UTILra:'+d.ra);
+            spu.consoleLog('UTIL4:'+d.v4);
+            spu.consoleLog('UTIL6:'+d.v6);
+            if (callback) {
+                callback(d.v4);
+            }
+        });
+
+    } else {
+        
+        if (isiDevice || navigator.sayswho.indexOf('IE ') > -1) {
+
+            spu.consoleLog('getClientIP Method: Server Call (remote)');
+
+            $.getJSON('//freegeoip.net/json/?callback=?', function(data) {
+                clientIP = data.ip;
+                //spu.consoleLog('CLIENT IP:' +clientIP);
+                if (callback) {
+                    callback(data.ip);
+                }
+                return data.ip;
+            });
+
+        } else {
+
+            spu.consoleLog('getClientIP Method: WebRTC');
+
+            window.RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;   //compatibility for firefox and chrome
+            var pc = new RTCPeerConnection({iceServers:[]}), noop = function(){};      
+            pc.createDataChannel("");    //create a bogus data channel
+            pc.createOffer(pc.setLocalDescription.bind(pc), noop);    // create offer and set local description
+            pc.onicecandidate = function(ice){  //listen for candidate events
+                if(!ice || !ice.candidate || !ice.candidate.candidate)  return;
+                var myIP = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/.exec(ice.candidate.candidate)[1];
+                //console.log('my IP: ', myIP);
+                pc.onicecandidate = noop;
+
+                clientIP = myIP;
+
+                if (callback) {
+                    callback(myIP);
+                }
+
+                return myIP;
+            };
+        }
+    
+    }
+}
+
+function setCookie(cName,cValue,exp,path,dom) {
+    var dt = new Date();
+    exp = (exp!='' ? exp : 1);
+    dt.setTime(dt.getTime() + (exp*24*60*60*1000));
+    exp = dt.toUTCString();
+    path = (path ? path : webPath);
+    dom = (dom ? dom : webHost);
+    var c = cName+'="'+cValue+'"';
+    document.cookie = cName+'='+cValue+';expires='+exp+';path=/';
+}
+function getCookie(cname) {
+    var name = cname + "=";
+    var ca = document.cookie.split(';');
+    for(var i = 0; i <ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0)==' ') {
+            c = c.substring(1);
+        }
+        if (c.indexOf(name) == 0) {
+            return c.substring(name.length,c.length);
+        }
+    }
+    return "";
+}
+
+function clientSetting(sName,sValue,sOp,sType) {
+    sOp = (typeof sOp==='undefined' ? '' : sOp).toLowerCase();
+    var op = '';
+    switch (sOp) {
+        case 'get':
+        case 'set':
+        case 'del':
+            op = sOp;
+            break;
+        default:
+            op = 'get';
+    }
+    sType = (typeof sType==='undefined' ? '' : sType).toLowerCase();
+    var type = ''
+    switch(sType) {
+        case 'session':
+            type = sType;
+            break;
+        default:
+            type = 'local';
+    }
+    
+    if (typeof(Storage) !== "undefined") {
+        // Code for localStorage/sessionStorage.
+
+        // sessionStorage is cleared when Tab is closed.
+        // localStorage is NEVER cleared.
+
+        // Store
+        //localStorage.setItem("SESSIONID", sidgen);
+        // Retrieve
+        //localStorage.getItem("SESSIONID")
+        // Remove
+        //localStorage.removeItem("SESSIONID");
+
+        if (type=='local') {
+            var valstore = localStorage.getItem(sName)===null ? '' : localStorage.getItem(sName);
+        } else {
+            var valstore = sessionStorage.getItem(sName)===null ? '' : sessionStorage.getItem(sName);
+        }
+        
+        if (valstore==='' || op=='set') {
+            if (type=='local') {
+                localStorage.setItem(sName, sValue);
+            } else {
+                sessionStorage.setItem(sName, sValue);
+            }
+        }
+        
+        if (op=='del') {
+            if (type=='local') {
+                localStorage.removeItem(sName);
+            } else {
+                sessionStorage.removeItem(sName);
+            }
+        }
+        
+        if (type=='local') {
+            valstore = localStorage.getItem(sName)===null ? '' : localStorage.getItem(sName);
+        } else {
+            valstore = sessionStorage.getItem(sName)===null ? '' : sessionStorage.getItem(sName);
+        }
+        
+        return valstore;
+
+
+    } else {
+        // No Web Storage support... use Cookie
+        
+        var valstore = getCookie(sName)===null ? '' : getCookie(sName);
+        
+        if (valstore==='' || op=='set') {
+            setCookie(sName, sValue, 365);
+        }
+        
+        if (op=='del') {
+            setCookie(sName, sValue, -1);
+        }
+        
+        valstore = getCookie(sName)===null ? '' : getCookie(sName);
+        
+        return valstore;
+    } 
 }

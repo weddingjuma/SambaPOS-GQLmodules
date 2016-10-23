@@ -1,19 +1,12 @@
 ////////////////////////////////
 //
-// zjscommon
+// core
 //
 ////////////////////////////////
+
 function loadMODULE(modscreen) {
     
     spu.refreshMoments();
-    
-//    var users;
-//    getUsers(function u(stuff){
-//        users = stuff;
-//        spu.consoleLog(users[0].PIN);
-//    });
-//    var passhash = CryptoJS.SHA512('1234').toString();
-//    spu.consoleLog(passhash);
     
     if (inSambaPOS) {
         // if the page is running inside SambaPOS HTML Viewer Widget
@@ -112,7 +105,7 @@ function loadMODULE(modscreen) {
             }
             if (modscreen=='reports') {
                 if (customReports.length==0) {
-                    getReportVars('PHP Custom Reports',function rl(data){
+                    getReportVars('GQLM Custom Reports',function rl(data){
                         customReports = data;
                         refreshReportDisplay();
                     });
@@ -191,21 +184,27 @@ function navigateTo(moduleParm,moduleVal,navParm) {
 
 $(document).ready(function(){
 
+    gql.Authorize('','',function ati(aresp){
+    
+
     sessionId = session_id();
     currentTerminal = navigator.sayswho;
-    
+        
     if (inSambaPOS){
         spu.getEmbeddedUserTerminal();
     }
 
-    getReportVars('PHP Custom Reports',function rl(data){
+ 
+    getReportVars('GQLM Custom Reports',function rl(data){
         customReports = data;
     });
     
-    getReportVars('PHP Users',function rl(data){
-        users = data;
-    });
+    if(!inSambaPOS) {
+        $('#USER_Auth').show();
+        document.getElementById('USER_inPIN').focus();
+    }
     
+    //logoutUser();
 
     spu.getBusinessSettings();
 
@@ -390,6 +389,9 @@ $(document).ready(function(){
             if (document.getElementById('REP_Parms')) {
                 var repParmsID = document.getElementById('REP_Parms');
             }
+            if (document.getElementById('USER_inPIN')) {
+                var userinPinId = document.getElementById('USER_inPIN');
+            }
             // if the CHAT input box has focus, we're done
             if (msgInputID == hasFocus || msgInputID_FS == hasFocus) {
                 if (kc==13 && msgInputID == hasFocus) {
@@ -416,6 +418,12 @@ $(document).ready(function(){
             if (repParmsID == hasFocus) {
                 if (kc==13) {
                     changeReportPeriod('ignore',false);
+                }
+            }
+            // if the Auth PIN Input box has focus, we can submit it by hitting ENTER
+            if (userinPinId == hasFocus) {
+                if (kc==13) {
+                    spu.validateUser('',userinPinId.value);
                 }
             }
             // if the Help Message has focus, we can close it by hitting ESC
@@ -472,6 +480,11 @@ $(document).ready(function(){
     //document.getElementById('clock_date').innerHTML="<b>" + thisDay + "</b>, " + day + " " + months[month] + " " + year;
     $( '#clock_date' ).html("<b>" + thisDay + "</b>, " + day + " " + months[month] + " " + year);
 
+    if(!inSambaPOS) {
+//      logoutUser(true);
+        spu.validateUser();
+    }
+});
 });
 
 //////////////////////////////////////////////////////////////
@@ -1760,10 +1773,10 @@ function loadTaskTypeList(callback) {
     if (document.getElementById('TSK_TaskTypePicker')) {
         TSK_TaskTypes = [];
         var ttypesstuff = '';
-        getReportVars('PHP Task Types',function tt(data){
+        getReportVars('GQLM Task Types',function tt(data){
             taskTypes = data;
             
-            getReportVars('PHP Task Type Custom Fields',function cf(cfdata){
+            getReportVars('GQLM Task Type Custom Fields',function cf(cfdata){
                 var ttcf = cfdata;
                 
                 for (var t=0; t<taskTypes.length; t++) {
@@ -1865,23 +1878,19 @@ function setReportFilterDefaults(callback) {
 function refreshReportDisplay() {
     $('#REP_Reports').html('<div class="info-message">Fetching Reports, please Wait...<br /><br />'+busyWheel+'</div>');
     var replist = '';
-//    getReportVars('PHP Custom Reports',function rl(data){
-//        customReports = data;
-//
-//    });
-        if (customReports.length>0) {
-            for (var r=0; r<customReports.length; r++) {
-                var rep = customReports[r];
-                if (rep["displayInExplorer"]=='True') {
-                    replist += '<div id="Reports_'+rep["name"].replace(/ /g,'_')+'" class="REP_Report" isSelected="0" hasParms="'+rep["hasParms"]+'">' + rep["name"] + (rep["hasParms"]==='1' ? ' <span style="color:#55FFBB;" title="Report contains parameters which may be required to produce output.">*</span>' : '') + '</div>';
-                }
+    if (customReports.length>0) {
+        for (var r=0; r<customReports.length; r++) {
+            var rep = customReports[r];
+            if (rep["displayInExplorer"]=='True') {
+                replist += '<div id="Reports_'+rep["name"].replace(/ /g,'_')+'" class="REP_Report" isSelected="0" hasParms="'+rep["hasParms"]+'">' + rep["name"] + (rep["hasParms"]==='1' ? ' <span style="color:#55FFBB;" title="Report contains parameters which may be required to produce output.">*</span>' : '') + '</div>';
             }
-            $('#REP_Reports').empty();
-            $('#REP_Reports').append(replist);
-            $('#REP_Reports').append('<div style="height:80px;"> </div>');
-        } else {
-            $('#REP_Reports').html('<div class="info-message">No Reports found.</div>');
         }
+        $('#REP_Reports').empty();
+        $('#REP_Reports').append(replist);
+        $('#REP_Reports').append('<div style="height:80px;"> </div>');
+    } else {
+        $('#REP_Reports').html('<div class="info-message">No Reports found.</div>');
+    }
 }
 
 function changeReportPeriod(period,parm) {

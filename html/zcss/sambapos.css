@@ -216,12 +216,15 @@ border-width: 2px;
 border-color: #FFBB00;
 padding: 3px;
 padding: 10px;
-background-color: #553333;
+background-color: #335577;
 color: #FFBB00;
 cursor: pointer;
 margin: auto;
 width:40%;
 text-align: center;
+-moz-border-radius: 10px;
+-webkit-border-radius: 10px;
+-o-border-radius: 10px;
 }
 #MSG_FS_Send:hover {
     border-color: #FFFFFF;
@@ -234,12 +237,15 @@ border-width: 2px;
 border-color: #FFBB00;
 padding: 3px;
 padding: 10px;
-background-color: #553333;
+background-color: #335577;
 color: #FFBB00;
 cursor: pointer;
 margin: auto;
 width:40%;
 text-align: center;
+-moz-border-radius: 10px;
+-webkit-border-radius: 10px;
+-o-border-radius: 10px;
 }
 #MSG_FS_close:hover {
     border-color: #FFFFFF;
@@ -378,12 +384,18 @@ border-width: 2px;
 border-color: #FFBB00;
 padding: 3px;
 padding: 10px;
-background-color: #553333;
+background-color: #335577;
 color: #FFBB00;
 cursor: pointer;
 margin: auto;
 width:40%;
 text-align: center;
+    /* Safari 3-4, iOS 1-3.2, Android 1.6- */
+    -webkit-border-radius:5px;
+    /* Firefox 1-3.6 */
+    -moz-border-radius:5px;
+    /* Opera 10.5, IE 9, Safari 5, Chrome, Firefox 4, iOS 4, Android 2.1+ */
+    border-radius:5px;
 }
 #CHAT_Send:hover {
     border-color: #FFFFFF;
@@ -1408,6 +1420,12 @@ text-align: center;
     margin:1px;
     vertical-align:middle;
     flex-grow:1;
+    /* Safari 3-4, iOS 1-3.2, Android 1.6- */
+    -webkit-border-radius:5px;
+    /* Firefox 1-3.6 */
+    -moz-border-radius:5px;
+    /* Opera 10.5, IE 9, Safari 5, Chrome, Firefox 4, iOS 4, Android 2.1+ */
+    border-radius:5px;
 }
 .REP_Command:hover {
     background-color:#333377;
@@ -1722,6 +1740,102 @@ width: 22%;
     border-color:#FFDDDD;
     z-index:150;
 }
+#USER_Auth {
+    position:fixed;
+    top:0px;
+    left:0px;
+    bottom:0px;
+    right:0px;
+    z-index:200;
+    margin:auto;
+    padding:10px;
+    color:#FFFFFF;
+    background-color:#330033;
+    background-color:rgba(50,0,50,0.9);
+    text-align: center;
+    font-size: 6vh;
+}
+#USER_inPIN {
+    margin:auto;
+    padding:5px;
+    color:#00DD99;
+    background-color:#000055;
+    font-size:30px;
+    width:200px;
+}
+#USER_goPIN {
+    margin:auto;
+    margin-top:20px;
+    padding:5px;
+    color:#99AAFF;
+    background-color:#550055;
+    font-size:30px;
+    font-weight:bold;
+    width:200px;
+    height:50px;
+    cursor:pointer;
+}
+#USER_goPIN:hover {
+    background-color:#662266;
+}
+
+.header-button {
+background-color:#444444;
+display: inline-block;
+vertical-align: middle;
+padding:0px;
+padding-top:15px;
+padding-bottom:15px;
+/*margin-top: 5px;
+margin-bottom: 5px;*/
+margin: 5px;
+font-size: 20px;
+text-align: center;
+color:#FFFFFF;
+z-index:101;
+border-style: solid;
+border-width: 1px;
+border-color:#aaaaaa;
+border-radius: 10px;
+-moz-border-radius: 10px;
+-webkit-border-radius: 10px;
+-o-border-radius: 10px;
+}
+.header-button:hover {
+background-color:#666666;
+box-shadow: 3px 3px 5px #202020;
+cursor:pointer;
+}
+#numpad {
+    margin:auto;
+    text-align:center;
+}
+.numpad-button {
+background-color:#444444;
+display: inline-block;
+vertical-align: middle;
+padding:15px;
+margin: 8px;
+font-size: 30px;
+font-family:Consolas,monospace;
+text-align: center;
+color:#FFFFFF;
+background-color:#000066;
+z-index:101;
+border-style: solid;
+border-width: 1px;
+border-color:#aaaaaa;
+border-radius: 10px;
+-moz-border-radius: 10px;
+-webkit-border-radius: 10px;
+-o-border-radius: 10px;
+}
+.numpad-button:hover {
+background-color:#666666;
+cursor:pointer;
+}
+
+
 
 #NAV_MainMenuDisplay {
     margin:auto;
@@ -1745,11 +1859,11 @@ width: 22%;
     height:20px;
     background-color:#444444;
     /* Safari 3-4, iOS 1-3.2, Android 1.6- */
-    -webkit-border-radius:50%; 
+    -webkit-border-radius:50%;
     /* Firefox 1-3.6 */
-    -moz-border-radius:50%; 
+    -moz-border-radius:50%;
     /* Opera 10.5, IE 9, Safari 5, Chrome, Firefox 4, iOS 4, Android 2.1+ */
-    border-radius:50%; 
+    border-radius:50%;
 }
 .CON_Connected {
     background-color:#55FF55;
@@ -1891,6 +2005,15 @@ align-self: flex-end;
 }
 }
 
+input,textarea,select {
+    padding:2px;
+    /* Safari 3-4, iOS 1-3.2, Android 1.6- */
+    -webkit-border-radius:5px;
+    /* Firefox 1-3.6 */
+    -moz-border-radius:5px;
+    /* Opera 10.5, IE 9, Safari 5, Chrome, Firefox 4, iOS 4, Android 2.1+ */
+    border-radius:5px;
+}
 /**********
 iPad 3
 **********/
