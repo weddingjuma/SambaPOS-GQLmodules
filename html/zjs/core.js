@@ -1,6 +1,6 @@
 ////////////////////////////////
 //
-// zjscommon
+// core
 //
 ////////////////////////////////
 
@@ -184,7 +184,7 @@ function navigateTo(moduleParm,moduleVal,navParm) {
 
 $(document).ready(function(){
 
-    gql.Authorize('',function ati(aresp){
+    gql.Authorize('','',function ati(aresp){
     
 
     sessionId = session_id();

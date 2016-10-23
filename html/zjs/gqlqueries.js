@@ -1,6 +1,15 @@
+////////////////////////////////
+//
+// gqlqueries
+//
+////////////////////////////////
+
 // define Object for all GraphQL stuff
 var gql = { };
 
+//----------------------------------------------------------------------------
+// main AJAX function to Post GQL Queries/Mutations and Receive data
+//----------------------------------------------------------------------------
 gql.EXEC = function (query, callback) {
     spu.consoleLog('EXEC GQL:' +query);
     var data = JSON.stringify({ query: query });
@@ -8,6 +17,7 @@ gql.EXEC = function (query, callback) {
     return jQuery.ajax({
     'type': 'POST',
     'url': GQLurl,
+    headers: {'Authorization':'Bearer '+accessToken},
     'contentType': 'application/json',
     'data': data,
     'dataType': 'json',
@@ -43,6 +53,54 @@ gql.EXEC = function (query, callback) {
                 }
             );
 };
+
+
+//----------------------------------------------------------------------------
+// GQL Authorization added in SambaPOS v5.1.61
+//----------------------------------------------------------------------------
+gql.Authorize = function (user, password, callback) {
+    var aurl = 'http://' + GQLhost + ':' + GQLport + '/Token';
+    user = (user ? user : 'samba');
+    password = (password ? password : 'password');
+    
+    spu.consoleLog('AUTHORIZING GQL ...');
+    spu.consoleLog('URL: '+aurl);
+    spu.consoleLog('PW: '+password);
+    
+    var rev = SambaPOS.split('.');
+    rev = Number(rev[2]);
+    
+    if (rev >= 61) {
+        
+        jQuery.ajax({
+        'type': 'POST',
+        'url': aurl,
+        cache:false,
+        headers: {'Content-Type':'application/x-www-form-urlencoded'},
+        data: $.param({grant_type:'password', username:user, password:password})
+        })
+        .done(function d(response){
+            accessToken = response.access_token;
+            spu.consoleLog('AUTHORIZED GQL: ' + accessToken);
+            if (callback) {
+                callback(accessToken);
+            }
+        });
+        
+    } else {
+        
+        spu.consoleLog('GQL AUTH requires v5.1.61+ ... bypassed.');
+        if (callback) {
+            callback(accessToken);
+        }
+        
+    }
+};
+
+
+//----------------------------------------------------------------------------
+// define functions for all Queries and Mutations
+//----------------------------------------------------------------------------
 
 gql.getLocalSetting = function(settingName) {
     return '{setting: getLocalSetting(name:"'+settingName+'"){name,value}}';

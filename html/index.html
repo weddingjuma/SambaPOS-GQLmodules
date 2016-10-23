@@ -33,17 +33,13 @@
 <script type="text/javascript" src='zjs/globalvars.js'></script>
 <script type="text/javascript" src='zjs/sputils.js'></script>
 <script type="text/javascript" src='zjs/gqlqueries.js'></script>
-<script type="text/javascript" src='zjs/zreportvars.js'></script>
-<script type="text/javascript" src='zjs/zjscommon.js'></script>
+<script type="text/javascript" src='zjs/core.js'></script>
 
 <script type="text/javascript" id="js_mod"></script>
 </head>
 
 <body>
 
-<!-- np:/ cp:/ c:1() sc:0() a:/0 -->
-
-<!-- vip:fe80::4827:401a:ffad:1260%2 vc: unique: -->
     <div id="containerMaster">
         
         <div id="top">
@@ -72,15 +68,39 @@
     <!-- hidden elements -->
     <div id="entityGrids"></div>
     <div id="infoMessage" title="click to close" style="display:none"></div>
-    <div id="USER_Auth" title="enter your PIN to continue" style="display:none"></div>
+    
+    <div id="USER_Auth" style="display:none">
+        <div id="numpad">
+            <input type="password" id="USER_inPIN" size="4" title="enter PIN and click GO">
+            <br/>
+            <div class="numpad-button" onclick="enterdigit('1','USER_inPIN')">1</div>
+            <div class="numpad-button" onclick="enterdigit('2','USER_inPIN')">2</div>
+            <div class="numpad-button" onclick="enterdigit('3','USER_inPIN')">3</div>
+            <br />
+            <div class="numpad-button" onclick="enterdigit('4','USER_inPIN')">4</div>
+            <div class="numpad-button" onclick="enterdigit('5','USER_inPIN')">5</div>
+            <div class="numpad-button" onclick="enterdigit('6','USER_inPIN')">6</div>
+            <br />
+            <div class="numpad-button" onclick="enterdigit('7','USER_inPIN')">7</div>
+            <div class="numpad-button" onclick="enterdigit('8','USER_inPIN')">8</div>
+            <div class="numpad-button" onclick="enterdigit('9','USER_inPIN')">9</div>
+            <br />
+            <div class="numpad-button" style="background-color:#660000;" onclick="enterdigit('back','USER_inPIN')">&lt;</div>
+            <div class="numpad-button" onclick="enterdigit('0','USER_inPIN')">0</div>
+            <div class="numpad-button" style="background-color:#000000;" onclick="enterdigit('clear','USER_inPIN')">X</div>
+            <br />
+            <div class="numpad-button" style="background-color:#006600;" onclick="spu.validateUser();">LOGIN</div>
+        </div>
+    </div>
+    
     <div id="errorMessage" style="display:none"></div>
     <div id="helpMessage" style="display:none"></div>
     <div id="MSG_fullscreen" style="display:none">
         <div id="MSG_FS_area">
             <div id="MSG_FS_messages" title="Incoming and Outgoing Messages."></div><input id="MSG_FS_Input" name="MSG_FS_Input" type="text" placeholder="(type message)" title="Enter your Message here and hit ENTER or click SEND."/>
             <div id="MSG_FS_buttons">
-                <div id="MSG_FS_close" title="Click here to close Fullscreen Messaging." onClick="chatShowFull('hide')">CLOSE</div>
                 <div id="MSG_FS_Send" title="Click here to send your Message." onclick="chatSendClick('MSG_FS');">SEND</div>
+                <div id="MSG_FS_close" title="Click here to close Fullscreen Messaging." onClick="chatShowFull('hide')">CLOSE</div>
             </div>
         </div>
     </div>

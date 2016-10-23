@@ -1,6 +1,8 @@
-/* 
-GLOBAL VARS
-*/
+////////////////////////////////
+//
+// GLOBAL VARS
+//
+////////////////////////////////
 
 var users;
 
@@ -12,6 +14,7 @@ var currentUserData = {};
 var clientIP;
 
 var sessionId;
+var accessToken;
 
 var isConnected = false;
 var tryingToReconnect = false;

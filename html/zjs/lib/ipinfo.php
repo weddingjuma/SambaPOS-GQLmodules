@@ -1,7 +1,8 @@
 <?php
 $ra = $_SERVER["REMOTE_ADDR"];
-$is4 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? true : false;
-$is6 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? true : false;
+
+$is4 = filter_var($ra, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? true : false;
+$is6 = filter_var($ra, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? true : false;
 
 function dtr_pton( $ip ){
     if(filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)){
@@ -35,7 +36,5 @@ $dObj->v6 = ($is6 ? dtr_pton($ra) : $ra);
 
 //print_r('pf:'.$data);
 
-//print_r($data);
-//echo json_encode($dObj);
 echo $data;
 ?>
