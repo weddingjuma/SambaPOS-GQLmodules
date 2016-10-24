@@ -39,7 +39,7 @@ var msgsrv = webHost;
 
 // GraphQL server
 var GQLhost = msgsrv;
-var GQLport = '9000'; // generally, this is the only parameter that might need to change
+var GQLport = '9898'; // generally, this is the only parameter that might need to change
 var GQLpath = '/api/graphql/';
 var GQLurl  = webProto + '//' + GQLhost + ':' + GQLport + GQLpath;
 
@@ -109,7 +109,11 @@ var bypassAllAuth = false;   // Bypass ALL Authentication
 var bypassIPs = [];          // if not Bypassing ALL Authentication, list the IPs that are allowed to bypass Authentication
     bypassIPs.push('::1');
     bypassIPs.push('127.0.0.1');
-
+    bypassIPs.push('192.168.1.190');
+    bypassIPs.push('192.168.0.4');
+    bypassIPs.push('192.168.0.5');
+    //bypassIPs.push('192.168.0.72');
+    bypassIPs.push('192.168.1.197');
 
 
 
