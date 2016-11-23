@@ -3,12 +3,17 @@
 // nav_timeclock_policies
 //
 ////////////////////////////////
-function init_nav() {
-    // do some stuff
-}
-spu.consoleLog('Initializing '+module.replace(/_/,' ').toUpperCase()+' ...');
+spu.consoleLog('Loading Module JS for: '+module.replace(/_/,' ').toUpperCase()+' ...');
 
-//updateTaskMessage('Loading...');
+function init_module() {
+    spu.consoleLog('Initializing Module JS for: '+module.replace(/_/,' ').toUpperCase()+' ...');
+    
+    TSK_TaskTypes = [];
+    TSK_TaskTypes.push(TC_PolicyTaskType);
+    $('#TSK_TaskTypePicker').empty();
+    $('#TSK_TaskTypePicker').append('<OPTION VALUE="'+TSK_TaskTypes[0]+'">'+TSK_TaskTypes[0]+'</OPTION>');
+    refreshTaskEditorDisplay(TSK_TaskTypes[0],'false');
+}
 
 $('#TSK_Tasks').on('click', '.TSK_Task', function(){
     var btn = this.id; // Employees_Jenery, Employees_Ovania, ...

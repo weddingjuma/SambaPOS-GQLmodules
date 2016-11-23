@@ -4,10 +4,15 @@
 //
 ////////////////////////////////
 
-var users;
+var users = [];
+var terminals = [];
+
+var currentUserRole = '';
+var userLogout = false;
 
 var currentUserData = {};
     currentUserData.name = 'unknownUser';
+    currentUserData.role = '';
     currentUserData.PIN = '';
     currentUserData.validated = false;
     
@@ -15,6 +20,8 @@ var clientIP;
 
 var sessionId;
 var accessToken;
+
+var inputValue = '';
 
 var isConnected = false;
 var tryingToReconnect = false;
@@ -64,8 +71,20 @@ var TSK_Tasks = [];
 var TSK_TaskTypes = [];
 
 // POS
+var POS_Terminal = {};
+    POS_Terminal.registered = false;
+    POS_Terminal.id = '';
+    POS_Terminal.name = '';
+    POS_Terminal.department = '';
+    POS_Terminal.ticketType = '';
+    POS_Terminal.user = '';
+    POS_Terminal.tickets = [];
 var POS_Menu = {};
 var POS_Ticket = {};
+var POS_TicketAreaContent = 'TicketList';
+var POS_OrderTagGroups = [];
+var POS_EntityTickets = [];
+var POS_SelectedTicketIds = [];
 var amcBtns_ticketCommands = [];
 var amcBtns_orderCommands = [];
 var amcBtns_ticketRow1 = [];
@@ -244,14 +263,14 @@ function updateQueryString(key, value, url) {
     }
 }
 
-
-//var txt = "Browser CodeName: " + navigator.appCodeName + "\r\n";
-//txt+= "Browser Name: " + navigator.appName + "\r\n";
-//txt+= "Browser Version: " + navigator.appVersion + "\r\n";
-//txt+= "Cookies Enabled: " + navigator.cookieEnabled + "\r\n";
-//txt+= "Platform: " + navigator.platform + "\r\n";
-//txt+= "User-agent header: " + navigator.userAgent + "\r\n";
-//txt+= "User-agent language: " + navigator.systemLanguage + "\r\n";
+var ngr = navigator;
+var txt = "Browser CodeName: " + navigator.appCodeName + "\r\n";
+txt+= "Browser Name: " + navigator.appName + "\r\n";
+txt+= "Browser Version: " + navigator.appVersion + "\r\n";
+txt+= "Cookies Enabled: " + navigator.cookieEnabled + "\r\n";
+txt+= "Platform: " + navigator.platform + "\r\n";
+txt+= "User-agent header: " + navigator.userAgent + "\r\n";
+txt+= "User-agent language: " + navigator.systemLanguage + "\r\n";
 //alert(txt);
 
 var devicePlatform = navigator.platform.toLowerCase();
@@ -270,23 +289,6 @@ if (isiDevice) {
     winEx = typeof window.external;
     hasMethods = (typeof window.external.ExecuteAutomationCommand === 'unknown' ? true : false);
     inSambaPOS = (((winEx === 'undefined' || hasMethods) && !isiDevice) ? true : false);
-}
-
-// shim for iPad scrollbars for Task Editor
-function jumpTop() {
-    if (navigator.userAgent.match(/(iPod|iPhone|iPad|Android)/)) {           
-        window.scrollTo(200,100); // first value for left offset, second value for top offset
-        window.setTimeout(function() {window.scrollTo(0,0);}, 300);
-        window.scrollTo(0, 0);
-        window.scroll(0, 1);
-    } else {
-        $('html,body').animate({
-            scrollTop: 0,
-            scrollLeft: 0
-        }, 300, function(){
-            $('html,body').clearQueue();
-        });
-    }
 }
 
 //alert('globs loaded.');

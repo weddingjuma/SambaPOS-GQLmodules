@@ -1,3 +1,5 @@
+/* global spu, modulePath, inSambaPOS, availableModules, busyWheel, ticketTypeName, POS_Terminal, defaultTerminal, POS_EntityTypes, POS_EntityTypesAuto, TSK_TaskTypes, TC_PunchControlTaskType, gql, taskTypes, getClientGMToffset, dateFormats, moment */
+
 ////////////////////////////////
 //
 // core
@@ -5,7 +7,8 @@
 ////////////////////////////////
 
 function loadMODULE(modscreen) {
-    
+    var fn = spu.fi(arguments);
+
     spu.refreshMoments();
     
     if (inSambaPOS) {
@@ -45,110 +48,42 @@ function loadMODULE(modscreen) {
         hdr += ' <span style="font-weight:bold;">'+hdrTitle+'</span>';
         $('#module').html(hdr);
         
-        $( "#containerMODULE" ).empty();
-        $( '#containerMODULE' ).append('<br /><br /><div class="info-message">Loading Module:<br /><br />[ '+hdrTitle+' ]<br /><br />... please wait ...<br /><br />'+busyWheel+'</div>');
 
+        $( '#containerMODULE' ).html('<br /><br /><div class="info-message">Loading Module:<br /><br />[ '+hdrTitle+' ]<br /><br />... please wait ...<br /><br />'+busyWheel+'</div>');
+
+
+        var moduleRoot = modulePath + modscreen + '/';
+        
+        var moduleHTML = moduleRoot + 'index.html';
+        var moduleJS   = moduleRoot + 'module.js';
+        
         // load HTML
-        $( "#containerMODULE" ).load( modulePath + modscreen + '/index.html', function() {
+        $( "#containerMODULE" ).load(moduleHTML, function(loadData,loadResponse) {
+//            spu.consoleLog(loadResponse);
+//            spu.consoleLog(loadData);
+            spu.consoleLog('+++++ LOADED: ' + moduleHTML);
             
-            var tdStamp = new Date();
-                tdStamp = tdStamp.getFullYear()+'-'+tdStamp.getMonth()+'-'+tdStamp.getDay()+'-'+tdStamp.getHours()+'.'+tdStamp.getMinutes()+'.'+tdStamp.getSeconds();
-            
-            // set the JS file to use for MODULE
-            var moduleJS = modulePath + modscreen + '/module.js';
-                //moduleJS+= '?ts='+tdStamp; // prevents caching
-                
-            // load JS
-            var s = document.createElement("script");
-                s.type = "text/javascript";
-                s.src = moduleJS;
-                s.innerHTML = null;
-                s.id = "js_"+modscreen;
-                document.getElementById("js_mod").innerHTML = "";
-                document.getElementById("js_mod").appendChild(s);
-            
-            spu.consoleLog( '+++++ LOADED: ' + moduleJS );
+
+//            $( "#js_mod" ).load(moduleJS, function(loadData,loadResponse) {
+            $.getScript(moduleJS, function(loadData,loadStatus) {
+//                console.log(loadResponse);
+//                console.log(loadData);
+                spu.consoleLog('+++++ LOADED: ' + moduleJS);
 
 
-            // perform initial functions pertaining to MODULE
+                // perform initial functions pertaining to MODULE
+                // each module.js file contains this function
+                init_module();
 
-            if (modscreen=='pos') {
-                workperiodCheck('',function wpo(workperiod){
-                    WPisOpen = workperiod.isOpen;
-                    if (!workperiod.isOpen) {
-                        spu.consoleLog('POS NOT ready.  Workperiod is CLOSED.');
-                        showInfoMessage('Workperiod is CLOSED.<br /><br />Click to Retry.');
-                    }
-                    $( '#menuItems' ).html('<br /><br /><div class="info-message">Loading Module:<br /><br />[ '+hdrTitle+' ]<br /><br />... please wait ...<br /><br />'+busyWheel+'</div>');
-                    $( '#ticketCommands' ).html('<br /><br /><div class="info-message">'+busyWheel+'</div>');
-                    $( '#orders' ).html('<br /><br /><div class="info-message">'+busyWheel+'</div>');
-                    $( '#ticketRow1' ).html('<br /><br /><div class="info-message">'+busyWheel+'</div>');
-                    $( '#ticketRow2' ).html('<br /><br /><div class="info-message">'+busyWheel+'</div>');
-                    $( '#categories' ).html('<br /><br /><div class="info-message">'+busyWheel+'</div>');
-                    POS_refreshPOSDisplay(function p(data){
-                        $('#orders').empty();
-                        POS_updateTicketOrders();
-                        selectedOrderCount = 0;
-                    });
-                });
-            }
-            
-            if (modscreen=='kitchen_display') {
-                KD_refreshTaskList();
-            }
-            if (modscreen=='customer_display') {
-                CD_clearDisplay();
-            }
-            if (modscreen=='timeclock') {
-                TC_refreshTimeclockDisplay(TC_EntityType,TC_EntitySearch);
-                setReportFilterDefaults();
-            }
-            if (modscreen=='reports') {
-                if (customReports.length==0) {
-                    getReportVars('GQLM Custom Reports',function rl(data){
-                        customReports = data;
-                        refreshReportDisplay();
-                    });
-                } else {
-                    refreshReportDisplay();
-                }
-                setReportFilterDefaults();
-            }
-            if (modscreen=='ticket_explorer') {
-                $('#TE_DisplayTicket').hide();
-                TE_changeTicketExplorerFilters('REP_PeriodPicker');
-            }
-            if (modscreen=='timeclock_policies') {
-                TSK_TaskTypes = [];
-                TSK_TaskTypes.push(TC_PolicyTaskType);
-                $('#TSK_TaskTypePicker').empty();
-                $('#TSK_TaskTypePicker').append('<OPTION VALUE="'+TSK_TaskTypes[0]+'">'+TSK_TaskTypes[0]+'</OPTION>');
-                refreshTaskEditorDisplay(TSK_TaskTypes[0],'false');
-            }
-            if (modscreen=='punch_editor') {
-                TSK_TaskTypes = [];
-                TSK_TaskTypes.push(TC_PunchControlTaskType);
-                $('#TSK_TaskTypePicker').empty();
-                $('#TSK_TaskTypePicker').append('<OPTION VALUE="'+TSK_TaskTypes[0]+'">'+TSK_TaskTypes[0]+'</OPTION>');
-                refreshTaskEditorDisplay(TSK_TaskTypes[0],'true');
-            }
-            if (modscreen=='task_editor') {
-                loadTaskTypeList(function tedisp(){
-                    refreshTaskEditorDisplay(TSK_TaskTypes[0],'false');
-                });
-            }
-            if (modscreen=='chat') {
-                getChatMessages();
-                document.getElementById('CHAT_Input').focus();
-            }
-            
-            // update page Title
-            updatePageTitle(modscreen);
-            
-            // broadcast MODULE to terminals
-            sendMODULE(module);
-            
-        });
+                // update page Title
+                updatePageTitle(modscreen);
+
+                // broadcast MODULE to terminals
+                sendMODULE(module);
+
+
+            }); // module.js load
+        }); // #containerModule HTML load
 
     } else {
         console.log('!!! ERROR: Module is not valid !!! '+modscreen);
@@ -158,6 +93,7 @@ function loadMODULE(modscreen) {
 
 
 function navigateTo(moduleParm,moduleVal,navParm) {
+    $('#loadMessage').hide();
     if (moduleParm && moduleVal) {
         //window.location.hash = updateQueryString(moduleParm,moduleVal) + '#' + moduleVal;
         //window.location.hash = moduleVal;
@@ -170,6 +106,19 @@ function navigateTo(moduleParm,moduleVal,navParm) {
     }
     loadMODULE(navParm);
 }
+
+function sendMODULE(modscreen) {
+    var fn = spu.fi(arguments);
+    var msg = '{"eventName":"NAVIGATION","eventData":"'+'NAV_'+modscreen+'","sid":"'+sessionId+'"}';
+    gql.EXEC(gql.postBroadcastMessage(msg), function(response) {
+        if (response.errors) {
+            gql.handleError(fn+" gql.postBroadcastMessage", response);
+        } else {
+            
+        }
+    });
+}
+
 
 
 
@@ -184,32 +133,65 @@ function navigateTo(moduleParm,moduleVal,navParm) {
 
 $(document).ready(function(){
 
-    gql.Authorize('','',function ati(aresp){
+    $('#inputGo').on('click', function(){
+        inputValue = $('#inputValue').val();
+        $('#inputDialog').hide();
+        spu.consoleLog('GO clicked!: '+inputValue);
+    });
+    $('#inputClear').on('click', function(){
+        inputValue = 'ERASEINPUTVALUE';
+        $('#inputDialog').hide();
+        spu.consoleLog('CLEAR clicked!: '+inputValue);
+    });
+    $('#inputCancel').on('click', function(){
+        inputValue = 'CANCELINPUTVALUE';
+        $('#inputDialog').hide();
+        spu.consoleLog('CANCEL clicked!: '+inputValue);
+    });
+
+
+
+    gql.Authorize('','',function gqlAuth(authresp){
     
 
     sessionId = session_id();
     currentTerminal = navigator.sayswho;
-        
+
+    POS_Terminal.id = clientSetting('terminalId','','get');
+    POS_Terminal.name = clientSetting('terminalName','','get');
+    POS_Terminal.department = clientSetting('terminalDepartment','','get');
+    POS_Terminal.ticketType = clientSetting('terminalTicketType','','get');
+    POS_Terminal.user = clientSetting('terminalUser','','get');
+    POS_Terminal.registered = (POS_Terminal.id!='' && POS_Terminal.id!=null ? true : false);
+
     if (inSambaPOS){
         spu.getEmbeddedUserTerminal();
     }
-
- 
-    getReportVars('GQLM Custom Reports',function rl(data){
-        customReports = data;
-    });
     
     if(!inSambaPOS) {
+        currentUserData.name = clientSetting('userName');
+        currentUserData.role = clientSetting('userRole');
+        currentUserData.PIN = clientSetting('phash');
+        currentUserData.validated = true;
+        currentUser = currentUserData.name;
+        currentUserRole = currentUserData.role;
+        if (currentUser=='' || currentUser=='undefined' || typeof currentUser==='undefined') {
+            currentUserData = {};
+            currentUserData.validated = false;
+            clientSetting('phash','','set');
+        }
         $('#USER_Auth').show();
         document.getElementById('USER_inPIN').focus();
+        spu.validateUser();
     }
     
-    //logoutUser();
 
     spu.getBusinessSettings();
 
+
     $('#module').html('???');
-    $('#currentUser').html('['+currentTerminal+'] '+currentUser);
+    $('#currentUser').html('['+POS_Terminal.name+'] '+currentUser);
+    $('#currentUser').attr('title',currentTerminal+' ['+POS_Terminal.id+'] ('+currentUserRole+')');
     $('#connection').html(isConnected==true ? '<div class="CON_Indicator CON_Connected"></div>' : '<div class="CON_Indicator CON_Disconnected"></div>');
     
     loadMODULE(module);
@@ -247,7 +229,7 @@ $(document).ready(function(){
     
     var proxy = connection.createHubProxy('default');
     proxy.on('update', function(message) {
-        //spu.consoleLog('*** MSG RCVD:'+message);
+//        spu.consoleLog('*** MSG RCVD:'+message);
         var msgparsed = HUB_parseMessage(message);
         var containsJSON = (msgparsed.indexOf('{')>-1 && msgparsed.indexOf('}')>-1 ? true :false);
         
@@ -392,6 +374,12 @@ $(document).ready(function(){
             if (document.getElementById('USER_inPIN')) {
                 var userinPinId = document.getElementById('USER_inPIN');
             }
+            if (document.getElementById('TERM_Info')) {
+                var termInfo = document.getElementById('TERM_Info');
+            }
+            if (document.getElementById('inputValue')) {
+                var inputValueId = document.getElementById('inputValue');
+            }
             // if the CHAT input box has focus, we're done
             if (msgInputID == hasFocus || msgInputID_FS == hasFocus) {
                 if (kc==13 && msgInputID == hasFocus) {
@@ -426,11 +414,18 @@ $(document).ready(function(){
                     spu.validateUser('',userinPinId.value);
                 }
             }
+            // if the input box has focus, we can submit it by hitting ENTER
+            if (inputValueId == hasFocus) {
+                if (kc==13) {
+                    $('#inputGo').click();
+                }
+            }
             // if the Help Message has focus, we can close it by hitting ESC
 //            if (helpMessageID == hasFocus) {
                 if (kc==27) {
                     $('#helpMessage').hide();
                     $('#errorMessage').hide();
+                    $('#TERM_Info').hide();
                 }
 //            }
             // if CHAT input box does not have focus and the Report Parameter Input does not have focus
@@ -479,10 +474,11 @@ $(document).ready(function(){
     clockTimer = setInterval(showTime, 500);
     //document.getElementById('clock_date').innerHTML="<b>" + thisDay + "</b>, " + day + " " + months[month] + " " + year;
     $( '#clock_date' ).html("<b>" + thisDay + "</b>, " + day + " " + months[month] + " " + year);
+//    $( '#clock_date' ).html("<b>" + thisDay + "</b>, " + day + " " + months[month]);
 
     if(!inSambaPOS) {
 //      logoutUser(true);
-        spu.validateUser();
+//        spu.validateUser();
     }
 });
 });
@@ -493,6 +489,14 @@ $(document).ready(function(){
 // 
 //////////////////////////////////////////////////////////////
 
+
+
+
+///////////////////////
+//
+// HUB (signalR)
+//
+///////////////////////
 
 function updateConnectionStatus(connState,opState) {
     var connState = (connState ? connState : isConnected);
@@ -522,478 +526,6 @@ function updateConnectionStatus(connState,opState) {
         });
 
     }
-}
-
-
-
-function workperiodCheck(wpid,callback) {
-    spu.consoleLog('Checking Workperiod Status...');
-    //getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters,function currentWP(report) {
-    getCustomReport('Workperiod Status',currentUser,'','','','',function currentWP(report) {
-        WPID = report.tables[0].rows[0].cells[0];
-        WPisOpen = report.tables[0].rows[0].cells[1]=='YES' ? true : false;
-        spu.consoleLog('Last WPID:'+WPID+' open:'+WPisOpen);
-        workperiod.id = WPID;
-        workperiod.isOpen = WPisOpen;
-        $( '#workperiod' ).html('<span class="'+(workperiod.isOpen ? 'WP_Open' : 'WP_Closed')+'">' + workperiod.id + '</span>');
-        if (callback) {
-            callback(workperiod);
-        }
-    });
-}
-    
-
-
-function sendMODULE(modscreen) {
-    var msg = '{"eventName":"NAVIGATION","eventData":"'+'NAV_'+modscreen+'","sid":"'+sessionId+'"}';
-    gql.EXEC(gql.postBroadcastMessage(msg), function(response) {
-        if (response.errors) {
-            gql.handleError("postBroadcastMessage", response.errors);
-        } else {
-            
-        }
-    });
-}
-
-function getLocalSetting(settingName, callback) {
-    gql.EXEC(gql.getLocalSetting(settingName), function(response) {
-        var sName='';
-        var sValu='';
-        if (response.errors) {
-            gql.handleError("getLocalSetting", response.errors);
-            callback('ERROR');
-        } else {
-            sName = response.data.setting.name;
-            sValu = response.data.setting.value;
-            if (callback) {
-                callback(sValu);
-            }
-        }
-    });
-}
-function getGlobalSetting(settingName, callback) {
-    gql.EXEC(gql.getGlobalSetting(settingName), function(response) {
-
-        var setting = {};
-            setting.error = '';
-
-        if (response.errors) {
-            gql.handleError("getGlobalSetting", response.errors);
-            setting.error = '!!! ERROR retrieving Global Setting ['+settingName+']';
-            spu.consoleLog(setting.error);
-//            callback('ERROR');
-        } else {
-            spu.consoleLog('Retrieved Global Setting ['+settingName+']: '+response.data.setting.value);
-            
-            setting.name = response.data.setting.name;
-            setting.value = response.data.setting.value;
-            setting.value = (setting.value===null ? '' : setting.value);
-            globalSettings[setting.name] = setting.value;
-            
-        }
-        if (callback) {
-            callback(setting);
-        }
-    });
-}
-
-function getTickets(startDate,endDate,isClosed,orderBy,take,skip, callback) {
-    gql.EXEC(gql.getTickets(startDate,endDate,isClosed,orderBy,take,skip), function(response) {
-        if (response.errors) {
-            gql.handleError("getTickets", response.errors);
-            if (callback) {
-                callback('ERROR');
-            }
-        } else {
-            var tickets = response.data.tickets;
-            spu.consoleLog('Got Tickets: '+tickets.length);
-            if (callback) {
-                callback(tickets);
-            }
-        }
-
-    });
-}
-
-function getTasks(taskType, startFilter, endFilter, completedFilter, nameLike, contentLike, fieldFilter, stateFilter, callback) {
-    var startTime='';
-    gql.EXEC(gql.getTasks2(taskType, startFilter, endFilter, completedFilter, nameLike, contentLike, fieldFilter, stateFilter), function(response) {
-        if (response.errors) {
-            gql.handleError("getTasks2", response.errors);
-            callback('ERROR');
-        } else {
-            var tasks = response.data.tasks;
-            spu.consoleLog('Got Tasks: '+tasks.length);
-        }
-        if (callback) {
-            callback(tasks);
-        }
-    });
-    //return tasks;
-}
-
-function TC_getTimeclockTasks(taskType,completedFilter,nameLike,contentLike,fieldFilter, state, callback) {
-    var startTime='';
-    gql.EXEC(gql.getTasks(taskType,completedFilter,nameLike,contentLike,fieldFilter, state), function(response) {
-        if (response.errors) {
-            gql.handleError("TC_getTimeclockTasks", response.errors);
-            callback('ERROR');
-        } else {
-            TC_Tasks = [];
-            var tasks = response.data.tasks;
-            spu.consoleLog('Got Timeclock Tasks: '+tasks.length);
-            TC_Tasks = tasks;
-        }
-        if (callback) {
-            callback(TC_Tasks);
-        }
-    });
-    return TC_Tasks;
-}
-
-function getTaskEditorTasks(taskType,completedFilter,nameLike,contentLike,fieldFilter, state, callback) {
-    var startTime='';
-    gql.EXEC(gql.getTasks(taskType,completedFilter,nameLike,contentLike,fieldFilter, state), function(response) {
-        if (response.errors) {
-            gql.handleError("getTaskEditorTasks", response.errors);
-            callback('ERROR');
-        } else {
-            TSK_Tasks = [];
-            var tasks = response.data.tasks;
-            spu.consoleLog('Got Task Editor Tasks: '+tasks.length);
-            TSK_Tasks = tasks;
-        }
-        if (callback) {
-            callback(TSK_Tasks);
-        }
-    });
-    return TSK_Tasks;
-}
-
-function KD_completeTasks(taskIDs, taskIdents, isCompleted, callback) {
-    spu.consoleLog('Marking KD Tasks Complete...');
-    $('#KD_Food').html('<div class="info-message">Completing Tasks, please Wait...<br /><br />'+busyWheel+'</div>');
-
-    var taskTypes = [];
-    for (var t=0; t<taskIDs.length; t++) {
-        taskTypes.push(KD_HTMLtaskType);
-    }
-
-  //updateTasks(taskTypes, taskIDs, taskIdents, isCompleted, state, customData, content, name, confirm, callback)
-    updateTasks(taskTypes, taskIDs, taskIdents, isCompleted, ''   , ''        , ''     , ''  , true   , function updTskId(){
-        
-        spu.consoleLog("Completed KD HTML Tasks!");
-
-        if (KD_interop) {
-            var taskTypes = [];
-            for (var t=0; t<taskIdents.length; t++) {
-                taskTypes.push(KD_GUItaskType);
-            }
-
-          //updateTasksByIdentifier(taskTypes, taskIdents, isCompleted, state, customData, content, confirm, callback)
-            updateTasksByIdentifier(taskTypes, taskIdents, isCompleted, ''   , ''        , ''     , true   , function updTskIdent(){
-
-                spu.consoleLog("Completed KD GUI Tasks!");
-                
-                var msg = '{"eventName":"TASKS_COMPLETED_HTML","terminal":"'+currentTerminal+'","userName":"'+currentUser+'","sid":"'+sessionId+'"}';
-                broadcastMessage(msg);
-                if(callback) {
-                    callback(updatedTasks);
-                }
-            });
-            
-        } else {
-
-            var msg = '{"eventName":"TASKS_COMPLETED_HTML","terminal":"'+currentTerminal+'","userName":"'+currentUser+'","sid":"'+sessionId+'"}';
-            broadcastMessage(msg);
-            if(callback) {
-                callback(updatedTasks);
-            }
-        }
-    });
-}
-function addTasks(taskTypes,taskNames,content,isCompleted,userName,customData,state, confirm, callback) {
-    if (confirm !== false) {
-        gql.EXEC(gql.addTasks(taskTypes,taskNames,content,isCompleted,userName,customData,state), function (response) {
-            if (response.errors) {
-                gql.handleError("addTasks", response.errors);
-            } else {
-                spu.consoleLog("addTasks Type("+taskTypes+') Name['+taskNames+'] State('+state+') Completed('+isCompleted+')');
-            }
-            if (callback) {
-                //callback(TC_Tasks);
-                callback(response);
-            }
-        });
-    } else {
-        if (callback) {
-            callback(TC_Tasks);
-        }
-    }
-}
-function updateTasks(taskTypes, taskIDs, taskIdents, isCompleted, state, customData, content, name, confirm, callback) {
-    if (confirm !== false) {
-        gql.EXEC(gql.updateTask(taskTypes, taskIDs, taskIdents, isCompleted, state, customData, content, name), function (response) {
-            if (response.errors) {
-                gql.handleError("updateTasks", response.errors);
-            } else {
-                spu.consoleLog("updateTasks Type("+taskTypes+') id['+taskIDs+'] ident['+taskIdents+'] State('+state+') Completed('+isCompleted+')');
-            }
-            if (callback) {
-                callback(response);
-            }
-        });
-    } else {
-        if (callback) {
-            callback();
-        }
-    }
-}
-
-function updateTasksByIdentifier(taskTypes, taskIdents, isCompleted, state, customData, content, confirm, callback) {
-    if (confirm !== false) {
-        gql.EXEC(gql.updateTaskByIdentifier(taskTypes, taskIdents, isCompleted, state, customData, content), function (response) {
-            if (response.errors) {
-                gql.handleError("updateTasksByIdentifier", response.errors);
-            } else {
-                spu.consoleLog("updateTasksByIdentifier Type("+taskTypes+') ident['+taskIdents+'] State('+state+') Completed('+isCompleted+')');
-            }
-            if (callback) {
-                callback(TC_Tasks);
-            }
-        });
-    } else {
-        if (callback) {
-            callback(TC_Tasks);
-        }
-    }
-}
-function updateTaskStateByIdentifier(taskTypes, taskIdents, state, stateDate, callback) {
-    gql.EXEC(gql.updateTaskStateByIdentifier(taskTypes, taskIdents, state, stateDate), function (response) {
-        if (response.errors) {
-            gql.handleError("updateTaskStateByIdentifier", response.errors);
-        } else {
-        }
-        if (callback) {
-            callback(TC_Tasks);
-        }
-    });
-}
-function deleteTasks(taskIDs, confirm, callback) {
-    if (confirm !== false) {
-        gql.EXEC(gql.deleteTask(taskIDs), function (response) {
-            if (response.errors) {
-                gql.handleError("deleteTasks", response.errors);
-            } else {
-                spu.consoleLog('deleteTasks id['+taskIDs+']');
-            }
-            if (callback) {
-                callback(response);
-            }
-        });
-    } else {
-        if (callback) {
-            callback();
-        }
-    }
-}
-
-function postTaskRefreshMessage(taskIDs, callback) {
-    spu.consoleLog('Posting Task Refresh Message...');
-    gql.EXEC(gql.postTaskRefreshMessage(taskIDs), callback);
-}
-
-function broadcastMessage(msg) {
-    spu.consoleLog('Broadcasting Message:'+msg);
-    gql.EXEC(gql.postBroadcastMessage(msg), function(response) {
-        if (response.errors) {
-            gql.handleError("broadcastMessage", response.errors);
-        } else {
-            spu.consoleLog('Message Broadcasted:'+response.data.postBroadcastMessage.message);
-        }
-    });
-}
-
-function getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters,callback) {
-    spu.consoleLog('Getting Custom Report ('+reportName+')...');
-    gql.EXEC(gql.getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters), function(response) {
-        if (response.errors) {
-            gql.handleError("getCustomReport", response.errors);
-        } else {
-            var report = response.data.report;
-            spu.consoleLog('getCustomReport:'+reportName+' (tables:'+report.tables.length+')');
-        }
-        if (callback) {
-            callback(report);
-        }
-    });
-    //return report;
-}
-
-function updateEntityState(entityType,entityName,stateName,state,callback) {
-    gql.EXEC(gql.updateEntityState(entityType,entityName,stateName,state), function(response) {
-        if (response.errors) {
-            gql.handleError("updateEntityState", response.errors);
-        } else {
-            var ent = response.data.updateEntityState;
-        }
-        if (callback){
-            callback(ent);
-        }
-    });
-}
-
-function KD_formatTaskStatus() {
-        var refreshedTaskCards = '';
-        for (var t=1; t<=taskCount; t++) {
-            if (document.getElementById('KD_Task_Status_'+t)) {
-                var taskCard = document.getElementById('KD_Task_Status_'+t);
-                var taskDTstart = taskCard.getAttribute('taskDTstart');
-                var taskDT = taskDTstart.split('T');
-                var taskDateStart = taskDT[0];
-                var taskTimeStart = taskDT[1].substr(0,5);
-                var when = new Date();
-                when = formatDateTime(when);
-                var elapsedMinutes = datediff(taskDTstart,when,'m').toFixed(3);
-                var orderAge = 'new';
-                var orderStatusBGcolor = '#004400';
-                var orderStatusText = 'New Order';
-                var orderStatusColor = '#55FF55';
-                if (elapsedMinutes < 15) {
-                    orderAge = 'new';
-                    orderStatusBGcolor = '#002200';
-                    orderStatusColor = '#55FF55';
-                    orderStatusText = 'New Order ('+Number(elapsedMinutes).toFixed(0)+' min)';
-                }
-                if (elapsedMinutes >= 15 && elapsedMinutes < 25) {
-                    orderAge = 'medium';
-                    orderStatusBGcolor = '#FFDD00';
-                    orderStatusColor = '#000000';
-                    orderStatusText = Number(elapsedMinutes).toFixed(0)+' minutes old';
-                }
-                if (elapsedMinutes >= 25 && elapsedMinutes < 45) {
-                    orderAge = 'old';
-                    orderStatusBGcolor = '#FF0000';
-                    orderStatusColor = '#FFFFFF';
-                    orderStatusText = Number(elapsedMinutes).toFixed(0)+' minutes old';
-                }
-                if (elapsedMinutes >= 45) {
-                    orderAge = 'stale';
-                    orderStatusBGcolor = '#001177';
-                    orderStatusColor = '#55BBFF';
-                    orderStatusText = 'STALE ('+Number(elapsedMinutes).toFixed(0)+' min)';
-                }
-
-                taskCard.style.color = orderStatusColor;
-                taskCard.style.backgroundColor = orderStatusBGcolor;
-                taskCard.innerHTML = ' ['+taskTimeStart+'] '+orderStatusText+' ';
-
-                refreshedTaskCards += t+',';
-            }
-        }
-        if (refreshedTaskCards.length>0) {
-            spu.consoleLog('Refreshed Task Card Statuses:'+refreshedTaskCards.substr(0,refreshedTaskCards.length-1));
-        }
-}
-function KD_updateTaskCards() {
-    var refreshedTaskCards = '';
-    if (taskCount>0) {
-        KD_formatTaskStatus();
-    }
-}
-function KD_taskStatusTimer(op,rate) {
-    if (op=='start') {
-        taskCardTimer = setInterval(KD_updateTaskCards, rate);
-        spu.consoleLog('Started Task Status Updater with refresh rate: '+rate+' ms.');
-    } else {
-        clearInterval(taskCardTimer);
-        spu.consoleLog('Stopped Task Status Updater.');
-    }
-}
-function KD_refreshTaskList(callback){
-    $('#KD_Food').html('<div class="info-message">Fetching Tasks, please Wait...<br /><br />'+busyWheel+'</div>');
-
-    gql.EXEC(gql.getTasks(KD_HTMLtaskType,'false'), function(response) {
-        if (response.errors) {
-            gql.handleError("KD_refreshTaskList", response.errors);
-        } else {
-            taskCount = 0;
-
-            if (taskCount < 1) {
-                KD_taskStatusTimer('stop');
-            }
-
-            taskCount = response.data.tasks.length;
-
-            spu.consoleLog('Refreshing Task List... TASKS:'+taskCount);
-            
-            var cardsPerRow = 4;
-            var cardCount = 0;
-            
-            var stuff = '';
-
-            for (var t=0; t<taskCount; t++) {
-                var taskNumber = t+1;
-                cardCount++;
-                var task = response.data.tasks[t];
-                var taskName = (task.name ? task.name : '');
-                var taskNameParts = taskName.split(' - ');
-                var taskEntities = (taskNameParts[1] ? taskNameParts[1] : '...');
-                var taskContent = task.content;
-
-                spu.consoleLog('TASK (card:'+taskNumber+') (id:'+task.id+'):'+task.name+' ... content:'+task.contentText.substr(0,6));
-                
-                stuff += '<div id="KD_Task_'+taskNumber+'" taskID="'+task.id+'" cardNumber="'+taskNumber+'" ident="'+task.identifier+'" class="KD_TaskCard_Food" isSelected="0">';
-                stuff += '<div class="KD_Task_Entities">' + taskEntities + '</div>';
-                stuff += '<div class="KD_Task_CardNumber">' + taskNumber + '</div>';
-
-                var timeOffset = getClientGMToffset().split(':');
-                var offsetHours = Number(timeOffset[0]);
-                    offsetHours = offsetHours + Number(timeOffset[1])/60;
-                    offsetHours = offsetHours * -1;
-                    offsetHours = 0;
-                var elemDate = moment(task.startDate, dateFormats).add(offsetHours,'hours').format('YYYY-MM-DDTHH:mm:ss');
-
-                stuff += '<div id="KD_Task_Status_'+taskNumber+'" taskDTstart="'+elemDate+'" class="KD_Task_Status">';
-                //stuff += ' ['+taskTimeStart+'] '+orderStatusText+' ';
-                stuff += '</div>';
-                
-                stuff += taskContent;
-                stuff += '</div>';
-            }
-
-            $("#KD_Food").empty();
-            $('#KD_Food').append(stuff);
-
-            if (taskCount > 0) {
-                KD_formatTaskStatus();
-                KD_taskStatusTimer('start',30000);
-            }
-
-            spu.consoleLog("Refreshed KD Tasks!");
-
-            if (callback) {
-                callback();
-            }
-        }
-    });
-}
-//var KD_refreshTaskList_debounced = spu.debounce(KD_refreshTaskList,2500);
-//var KD_refreshTaskList_debounced = spu.debounce(KD_refreshTaskList,1000);
-var KD_refreshTaskList_debounced = spu.debounce(KD_refreshTaskList,1000);
-
-function calculateTaskDuration() {
-    var start = document.getElementById('taskStart').value;
-    var end   = document.getElementById('taskEnd').value;
-    
-    var hours = datediff(start,end,'h').toFixed(2);
-    var mins  = datediff(start,end,'m').toFixed(2);
-    var secs  = datediff(start,end,'s').toFixed(2);
-
-    var out = hours+' h / ' + mins+' m / ' + secs+' s';
-    
-    document.getElementById('taskDuration').value = out;
-    return out;
 }
 
 function HUB_parseMessage(message) {
@@ -1032,8 +564,15 @@ function HUB_parseMessage(message) {
 
 function HUB_handleEvent(ev) {
     var evContent  = ev[0];
+    var evData = [];
+//        eventData.push(JSON.stringify(evContent));
+    
     if (ev[0]['eventName']) {
         var eventName = ev[0]['eventName'];
+    }
+    // seems there is a new message in .61+ called "event"
+    if (ev[0]['event']) {
+        var eventName = ev[0]['event'];
     }
     if (ev[0]['eventData']) {
         var eventData = ev[0]['eventData'];
@@ -1056,11 +595,15 @@ function HUB_handleEvent(ev) {
     
     spu.consoleLog('/////////////////////////// '+eventName+' /////////////////////////////////////');
     spu.consoleLog('... ... JSON ... ... ... ...');
+
     for(var i=0;i<ev.length;i++){
         var obj = ev[i];
+        var subObj = {};
+        
         for(var key in obj){
             var attrName = key;
             var attrValue = obj[key];
+            subObj[attrName] = attrValue;
             spu.consoleLog(attrName+':>'+attrValue);
             
             if (eventName == 'PAYMENT_PROCESSED' || eventName == 'TICKET_DISPLAYED') {
@@ -1092,6 +635,8 @@ function HUB_handleEvent(ev) {
                 }
             }
         }
+        var subObjJSON = JSON.stringify(subObj);
+        evData.push(subObj);
     }
     spu.consoleLog('... ... .... ... ... ... ...');
 
@@ -1186,9 +731,59 @@ function HUB_handleEvent(ev) {
                 }
             });
             break;
-        case 'TICKET_OPENED':
+        case 'TICKETS_MERGED':
+            if (module=='pos' && sid==sessionId) {
+                if (POS_TicketAreaContent=='TicketList') {
+                    var ticketIds = evData[0].ticketIds;
+                    var ticketId = evData[0].ticketId;
+                    if (ticketIds.indexOf(',')>-1) {
+                        spu.consoleLog(eventName+'> '+'Calling: POS_refreshTicketList('+ticketIds+') ...');
+                        POS_fillEntityGrids();
+                        POS_refreshTicketList();
+                        POS_loadTerminalTicket(POS_Terminal.id,ticketId);
+                    } else {
+                        spu.consoleLog('ticketIds is empty, skipping POS_refreshTicketList.');
+                    }
+                }
+            } else {
+                spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
+            }
+            break;
         case 'TICKET_CLOSED':
+            if (module=='pos') {
+                if (POS_TicketAreaContent=='TicketList') {
+                    var tid = evData[0].ticketId;
+                    if (tid>0) {
+                        spu.consoleLog(eventName+'> '+'Calling: POS_refreshTicketList('+evData[0]['ticketId']+') ...');
+                        POS_fillEntityGrids();
+                        POS_refreshTicketList(tid);
+                    } else {
+                        spu.consoleLog('ticketId is 0, skipping POS_refreshTicketList.');
+                    }
+                }
+            } else {
+                spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
+            }
+            break;
         case 'TICKET_REFRESH':
+            if (module=='pos') {
+                if (POS_TicketAreaContent=='Orders') {
+                    var tid = evData[0].eventData;
+                    if (tid>0) {
+                        spu.consoleLog(eventName+'> '+'Calling: POS_getTerminalTicket('+evData[0]['ticketId']+') ...');
+                        POS_loadTerminalTicket(POS_Terminal.id,tid);
+//                        POS_getTerminalTicket(POS_Terminal.id);
+                    } else {
+                        spu.consoleLog('ticketId is 0, skipping POS_getTerminalTicket.');
+                    }
+                }
+            } else {
+                spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
+            }
+            break;
+        case 'MERGE_TICKETS':
+        case 'TICKET_OPENED':
+//        case 'TICKET_REFRESH':
         case 'WIDGET_REFRESH':
         case 'NAVIGATION':
         case 'WORKPERIOD_CHECK':
@@ -1201,672 +796,32 @@ function HUB_handleEvent(ev) {
     spu.consoleLog('--------------------------- // -------------------------------------');
 }
 
-function getChatMessages(callback) {
-    // getTasks(taskType, startFilter, endFilter, completedFilter, nameLike, contentLike, fieldFilter, stateFilter, callback)
-    getTasks('CHAT Message Task', nowDateLessDay, monthEnd, false, '', '', '', '', function gt(tasks){
-        var chatMessages = '';
-        for (var t=0; t<tasks.length; t++) {
-            var task = tasks[t];
-            var cd = {};
-            for (var c=0; c<task.customData.length; c++) {
-                var d = task.customData[c];
-                cd[d.name] = d.value;
-            }
-            
-            var msgDateTime = task.startDate.substr(0,16).replace(/T/g,' ');
-            chatMessages += '<span style="color:#AAAAAA">' + msgDateTime + ' </span>';
-            
-            if (cd.sid == sessionId) {
-                chatMessages += '<span style="color:Orange">[YOU] ';
-            }
-            
-            chatMessages += '['+cd.terminal+'] (' + cd.user +'): '+ task.content + "<br/>";
-            
-            if (cd.sid == sessionId) {
-                chatMessages += '</span>';
-            }
-        }
-            
-        $('#MSG_FS_messages').empty();
-        $('#MSG_FS_messages').append(chatMessages);
-        $("#MSG_FS_messages").scrollTop($("#MSG_FS_messages")[0].scrollHeight);
-
-//            $('#MSG_FS_messages').append(post);
-//            $("#MSG_FS_messages").scrollTop($("#MSG_FS_messages")[0].scrollHeight);
-
-        if (document.getElementById('CHAT_messages')) {
-            $('#CHAT_messages').html( $('#MSG_FS_messages').html() );
-            $("#CHAT_messages").scrollTop($("#CHAT_messages")[0].scrollHeight);
-        }
-
-        if (callback) {
-            callback(chatMessages);
-        }
-        return chatMessages;
-    });
-}
-
-function processChatMessage(m) {
-    var msg  = m.message;
-    var term = m.terminal;
-    var usr  = m.userName;
-    var sid  = m.sid;
-    var post = '['+term+'] '+usr+': '+msg+'<br />';
-    spu.consoleLog('CHAT Message: '+post);
-    if (sessionId == sid) {
-        spu.consoleLog('CHAT message is from this client... skipping.');
-    } else {
-        $('#MSG_messaging').html('<div class="MSG_Indicator MSG_NewMessage">MSG</div>');
-        // getTasks(taskType, startFilter, endFilter, completedFilter, nameLike, contentLike, fieldFilter, stateFilter, callback)
-        getChatMessages();
-    }
-}
-function sendChatMessage (usr,term,sid,msg) {
-    var dtNow = new Date();
-    var utcMilliSeconds = getDateTime(dtNow,'ms');
-    var taskTypes = ['CHAT Message Task'];
-    var taskNames = [usr+'-'+sid];
-    var customData = [];
-        customData.push({name:"Id",value:utcMilliSeconds+'-'+usr});
-        customData.push({name:"terminal",value:term});
-        customData.push({name:"user",value:usr});
-        customData.push({name:"sid",value:sid});
-        customData.push({name:"message",value:msg});
-        
-    // addTasks(taskTypes,taskNames,content,isCompleted,userName,customData,state, confirm, callback)
-    addTasks(taskTypes,taskNames,msg,false,usr,customData,'',true, function sm(){
-        var bmsg = '{"eventName":"CHAT","userName":"'+usr+'","terminal":"'+term+'","sid":"'+sid+'","message":"'+msg+'"}';
-        broadcastMessage(bmsg);
-    });
-}
-function chatSendClick(btn) {
-    var msg = '';
-    if (document.getElementById(btn+'_Input')) {
-        msg = document.getElementById(btn+'_Input').value;
-        spu.consoleLog('MSG:'+msg);
-
-        $('#MSG_messaging').html('<div class="MSG_Indicator MSG_NoMessage">MSG</div>');
-
-        if (msg!='') {
-            document.getElementById(btn+'_Input').value='';
-            var usr = currentUser;
-            var term = currentTerminal;
-            var sid = sessionId;
-            var post = '<span style="color:#AAAAAA">' + moment().format('YYYY-MM-DD HH:mm') + ' </span>';
-                post+= '<span style="color:Orange">[YOU] ('+usr+'): '+msg+'</span><br />';
-            sendChatMessage(usr,term,sid,msg);
-            $('#'+btn+'_Input').focus();
-            if (document.getElementById('MSG_FS_messages')) {
-                $('#MSG_FS_messages').append(post);
-                $("#MSG_FS_messages").scrollTop($("#MSG_FS_messages")[0].scrollHeight);
-            }
-            if (document.getElementById('CHAT_messages')) {
-                $('#CHAT_messages').html( $('#MSG_FS_messages').html() );
-                $("#CHAT_messages").scrollTop($("#CHAT_messages")[0].scrollHeight);
-            }
-        }
-    }
-}
-function chatShowFull(hideShow) {
-    if (hideShow=='hide') {
-        $('#MSG_fullscreen').hide();
-    } else {
-        getChatMessages();
-        $('#MSG_fullscreen').show();
-        $('#MSG_FS_Input').focus();
-        $('#MSG_messaging').html('<div class="MSG_Indicator MSG_OldMessage">MSG</div>');
-    }
-}
 
 
+////////////////////////////
+//
+// REPORTS
+//
+////////////////////////////
 
-
-
-function CD_clearDisplay() {
-    spu.consoleLog('Clearing Customer Display...');
-    $("#CD_orders").empty();
-    $('#CD_ticketTotalValue').empty();
-    $('#CD_ticketDiscounts').empty();
-    $('#CD_ticketHeader').empty();
+function getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters,callback) {
+    var fn = spu.fi(arguments);
+    user = typeof user==='undefined' || user=='undefined' || user=='' ? defaultUser : user;
     
-    $('#CD_orders').hide();
-    $('#CD_ticketTotalValue').hide();
-    $('#CD_ticketDiscounts').hide();
-    $('#CD_ticketHeader').hide();
-
-    //$('#CD_idle').show();
-    
-    var idlestuff = '';
-    idlestuff += welcomeMessage+'<br /><br /><span class="CD_venueName">'+venueName+'</span>';
-    idlestuff += '<br /><br /><br />';
-    idlestuff += (WPisOpen ? openMessage : closedMessage);
-    $('#CD_idle').html(idlestuff);
-    $('#CD_idle').show();
-}
-var CD_clearDisplay_delayed = spu.debounce(CD_clearDisplay,15000);
-
-function CD_updateDisplay(ticketData) {
-    spu.consoleLog('Updating Customer Display...');
-
-    var timeOffset = getClientGMToffset().split(':');
-    var offsetHours = Number(timeOffset[0]);
-        offsetHours = offsetHours + Number(timeOffset[1])/60;
-        //offsetHours = offsetHours * -1;
-        offsetHours = 0;
-    
-    if (ticketData) {
-        spu.consoleLog('Displaying Ticket, Number:'+ticketData.number+' (Id:'+ticketData.id+') Date:'+ticketData.date+' ...');
-
-        var elemDate = moment(ticketData.date, dateFormats).add(offsetHours,'hours').format('YYYY-MM-DD HH:mm');
-
-        var totalAmount = Number(ticketData.totalAmount).toFixed(2);
-        var remainingAmount = Number(ticketData.remainingAmount).toFixed(2);
-
-        var orderUID = 0;
-        var cdttl = 0;
-        var discountttl = 0;
-        var giftttl = 0;
-        var savingsttl = 0;
-
-        $('#CD_idle').hide();
-
-        $('#CD_orders').show();
-        $('#CD_ticketTotalValue').show();
-        $('#CD_ticketDiscounts').show();
-        $('#CD_ticketHeader').show();
-
-        var stuff = '';
-
-        for (var o=0; o<ticketData.orders.length; o++) {
-            var order = ticketData.orders[o];
-            orderUID++;
-            order.orderUID = orderUID;
-            var price = Number(order.price).toFixed(2);
-            order.priceTotal = (Number(order.quantity) * Number(order.price));
-            var orderQuantity = Number(order.quantity).toFixed(0);
-
-            var portion = (order.portion!='Normal' ? '<span style="color:#00AAEE;font-size:16px;"> ('+order.portion+')</span>' : '');
-
-            stuff += '<div class="CD_order">';
-            stuff += '<div class="CD_orderLine">';
-            stuff += '      <div class="CD_orderQuantity">'+orderQuantity+'</div>';
-            stuff += '      <div class="CD_orderName">'+order.name+portion+'</div>';
-            stuff += '      <div class="CD_orderPrice">'+price+'</div>';
-
-            for (var t=0; t<order.tags.length; t++) {
-                var orderTag = order.tags[t];
-                if (orderTag.price!=0) {
-                    order.priceTotal = order.priceTotal + (orderTag.quantity * orderTag.price);
-                }
-                if (orderTag.price<0) {
-                    discountttl = (Number(discountttl) + ((orderTag.quantity * orderTag.price) * -1));
-                }
-            }
-            
-            var oStates = '';
-            for (var s=0; s<order.states.length; s++) {
-                var orderState = order.states[s];
-                oStates += orderState.state + (s!=(order.states.length-1) ? ', ' : '');
-                
-                if (orderState.state=='Void') {
-                    order.priceTotal = 'VOID';
-                } else if (orderState.state=='Gift') {
-                    giftttl = (Number(giftttl) + Number(order.priceTotal));
-                    order.priceTotal = 'FREE';
-                } else {
-                    cdttl = (Number(cdttl) + Number(order.priceTotal)).toFixed(2);
-                }
-            }
-            
-            order.priceTotal = (isNumeric(order.priceTotal) ? order.priceTotal.toFixed(2) : order.priceTotal);
-            
-            stuff += '<div id="orderPriceTotal" class="CD_orderPriceTotal'+(isNumeric(order.priceTotal) ? '' : ' CD_'+order.priceTotal)+'">'+order.priceTotal+'</div>';
-
-            stuff += '</div>';
-
-            // we don't need Order States on the Customer Display...
-            //
-            //stuff += '<div class="CD_orderState">'+oStates+'</div>';
-            //
-            //
-
-            for (var t=0; t<order.tags.length; t++) {
-                var orderTag = order.tags[t];
-                var tagPrice = Number(orderTag.price).toFixed(2);
-                var tagTotalPrice = (Number(order.quantity) * Number(orderTag.quantity) * Number(orderTag.price)).toFixed(2);
-
-                stuff += '<div class="CD_orderTagValue">';
-                stuff += (orderTag.quantity > 1 ? orderTag.quantity+'x' : '&nbsp;&nbsp;');
-                stuff += '&nbsp;'+orderTag.tag;
-                stuff += (tagPrice!=0 ? ' ... '+tagPrice+' ... '+tagTotalPrice : '');
-                stuff += '</div>';
-                cdttl = (Number(cdttl) + Number(tagTotalPrice)).toFixed(2);
-            }
-            //});
-
-            stuff += '</div>';
-
-            savingsttl = (Number(discountttl) + Number(giftttl));
-        }
-        //});
-
-        $("#CD_orders").empty();
-        $("#CD_orders").append(stuff);
-        $("#CD_orders").scrollTop($("#CD_orders")[0].scrollHeight);
-
-        var headerstuff = '';
-        headerstuff += '<div style="display:flex;flex-direction:column;" id="ticket_'+ticketData.id+'">';
-        headerstuff += '<div class="CD_paymentLine">';
-        headerstuff += '<div class="CD_paymentLabel">TICKET:'+ticketData.number+' (Id:'+ticketData.id+') '+elemDate+'</div>';
-        headerstuff += '<div class="CD_paymentAmt">';
-        var entitystuff = '';
-
-        var entCount = ticketData.entities.length;
-        for (var e=0; e<entCount; e++) {
-            var entity = ticketData.entities[e];
-            entitystuff += entity.type.substr(0,(entity.type.length-1))+':<b>'+entity.name+'</b>';
-            entitystuff += (e==entCount-1) ? '' : ' / ';
-        }
-
-        headerstuff += entitystuff+'</div></div>';
-        headerstuff += '</div>';
-        $("#CD_ticketHeader").html(headerstuff);
-
-
-        var paystuff = '';
-        paystuff += '<div style="display:flex;flex-direction:column;">';
-        paystuff += '<div class="CD_paymentLine"><div class="CD_paymentLabel">TOTAL: </div><div class="CD_paymentAmt">'+totalAmount+'</div></div>';
-        paystuff += '<div class="CD_paymentLine"><div class="CD_paymentLabel">Paid: </div><div class="CD_paymentAmt">'+(totalAmount-remainingAmount).toFixed(2)+'</div></div>';
-        paystuff += (tenderedAmount>0 ? '<div class="CD_paymentLine"><div class="CD_paymentLabel">Tendered: </div><div class="CD_paymentAmt"><span class="CD_paymentType">('+paymentTypeName+')</span> '+tenderedAmount + '</div></div>' : '');
-        paystuff += (processedAmount>0 ? '<div class="CD_paymentLine"><div class="CD_paymentLabel">Processed: </div><div class="CD_paymentAmt">'+processedAmount + '</div></div>' : '');
-        paystuff += '<div class="CD_paymentLine"><div class="CD_paymentLabel">OWING: </div><div class="CD_paymentAmt">'+remainingAmount+'</div></div>';
-        paystuff += (changeAmount>0 ? '<div class="CD_paymentLine"><div class="CD_paymentLabel">CHANGE: </div><div class="CD_paymentAmt">'+changeAmount+'</div></div>' : '');
-        paystuff += '</div>';
-
-        $('#CD_ticketTotalValue').html(paystuff);
-
-        var savingstuff = '';
-        savingstuff += '<div style="display:flex;flex-direction:column;">';
-        savingstuff += '<div class="CD_paymentLine"><div class="CD_paymentLabel">FREE: </div><div class="CD_paymentAmt">'+giftttl.toFixed(2)+'</div></div>';
-        savingstuff += '<div class="CD_paymentLine"><div class="CD_paymentLabel">Discounts: </div><div class="CD_paymentAmt">'+discountttl.toFixed(2)+'</div></div>';
-        savingstuff += '<div class="CD_paymentLine"><div class="CD_paymentLabel">TOTAL SAVINGS: </div><div class="CD_paymentAmt">'+savingsttl.toFixed(2)+'</div></div>';
-        savingstuff += '</div>';
-
-        if (Number(savingsttl) != 0) {
-            $('#CD_ticketDiscounts').html(savingstuff);
-            $('#CD_ticketDiscounts').show();
-        } else {
-            $('#CD_ticketDiscounts').hide();
-        }
-        
-        //spu.consoleLog(evContent);
-        spu.consoleLog(ticketData);
-    } else {
-        spu.consoleLog('No ticketData to display !!!');
-    }
-}
-
-function TC_refreshEmployeeEntities(entityType, search, stateFilter, tasks, callback){
-    // singular name of entityType
-    var eType = entityType.substr(0,entityType.length-1);
-    
-    var GMToffset = getClientGMToffset();
-    
-    gql.EXEC(gql.getEntities(entityType, search, stateFilter), function(response) {
+    spu.consoleLog('Getting Custom Report ('+reportName+')...');
+    gql.EXEC(gql.getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters), function(response) {
         if (response.errors) {
-            gql.handleError("TC_refreshEmployeeEntities", response.errors);
+            gql.handleError(fn+" gql.getCustomReport", response);
         } else {
-            spu.consoleLog('TC_refreshEmployeeEntities:'+entityType+' ('+response.data.entities.length+')');
-            
-            var entities = response.data.entities;
-
-            $('#TC_Entities').empty();
-
-            jsonData = entities;
-            jsonData = sortJSON(jsonData,"name",true);
-            
-            TC_Entities = [];
-
-            for (var e=0; e<entities.length; e++) {
-                
-                var entity = entities[e];
-
-                for (var s=0; s<entity.states.length; s++) {
-                    var ST = entity.states[s];
-                    if (ST.stateName=="TC Punch Status") {
-                        entity.punchState = ST.state;
-                        entity.punchStateClass = 'TC_' + ST.state.replace(/ /g,'_');
-                        //spu.consoleLog(entity.type+":"+entity.name+" Status State:"+ST.state+entity.statusState);
-                    }
-                }
-                
-                var payRates = '';
-                
-                for (var c=0; c<entity.customData.length; c++) {
-                    var cd = entity.customData[c];
-                    if (cd.name.indexOf('Rate')>-1) {
-                        payRates += (c>0 ? ',' : '');
-                        payRates += cd.name + ':' + cd.value;
-                    }
-                }
-                
-                entity.payRates = payRates;
-                
-                entity.entityDivId = entityType.replace(/ /g,'_') + '_' + entity.name.replace(/ /g,'_');
-                entity.entTimerId = 'TC_StateDuration_' + entity.name.replace(/ /g,'_');
-                entity.clockState = entity.punchState.replace(/Punched/g,'Clocked');
-                entity.taskStart = '';
-                entity.taskStartUTC = '';
-                entity.taskDatetimeISO = '';
-                entity.taskId = '';
-                entity.taskIdent = '';
-                for (var t=0; t<tasks.length; t++) {
-                    var task = tasks[t];
-                    //spu.consoleLog('>>>>>>>>>>>>>>>>>>>>>>>>>>'+task.id+ ' '+task.identifier+' '+task.startDate);
-                    if (task.name == entity.name) {
-                        // if (task.state == entity.punchState) {
-                        entity.taskId = task.id;
-                        entity.taskIdent =  task.identifier;
-                        var startDT = task.startDate.toString(); // 2016-07-30T13:37:44.587Z
-                        var startMS = startDT.substr(20,4).replace(/Z/g,'');
-                            startMS = (startMS<100 ? (startMS<10 ? '00'+startMS : '0'+startMS) : startMS);
-                            startDT = startDT.substr(0,19) + '.' + startMS + GMToffset;
-                            
-                        entity.taskStart = startDT; // 2016-07-30T13:37:44.587
-                        
-                        var dtISO = startDT;// + GMToffset;   // 2016-07-30T13:37:44.587-06:00
-                        entity.taskDatetimeISO = dtISO;
-                        var tsUTC = Date.parse(dtISO).toString();                   // 1469907464587
-                            tsUTC = (tsUTC.length>10 ? tsUTC.substr(0,10) : tsUTC); // 1469907464
-                        entity.taskStartUTC = tsUTC;
-                        //}
-                    }
-                }
-                
-                if (entity.taskIdent == '') {
-                    entity.punchState = 'Punched Out';
-                    entity.punchStateClass = 'TC_Punched_Out';
-                    entity.clockState = entity.punchState.replace(/Punched/g,'Clocked');
-                    spu.consoleLog('NO PUNCH DATA FOUND.  Setting initial Entity Punch State: ' + entity.punchState);
-                    updateEntityState('Employees',entity.name,'TC Punch Status','Punched Out');
-                }
-
-                var estuff = '';
-                
-                estuff += '<div id="' + entity.entityDivId + '"';
-                estuff += ' class="TC_Entity"';
-                estuff += ' entityType="' + entityType + '"';
-                estuff += ' entityId="' + entity.id + '"';
-                estuff += ' entityName="' + entity.name+ '"';
-                estuff += ' payRates="' + entity.payRates + '"';
-                estuff += ' punchState="' + entity.punchState + '"';
-                estuff += ' taskId="'+entity.taskId+'"';
-                estuff += ' taskIdent="'+entity.taskIdent+'"';
-                estuff += ' taskStart="'+entity.taskStart+'"';
-                estuff += ' taskStartUTC="'+entity.taskStartUTC+'"';
-                estuff += ' taskDatetimeISO="'+entity.taskDatetimeISO+'"';
-                estuff += ' isSelected="0"';
-                estuff += '>';
-                estuff += '<div class="TC_EntityName">';
-                estuff += entity.name;
-                estuff += '</div>';
-                estuff += '<div class="' + entity.punchStateClass + '">';
-                estuff += entity.clockState;
-                estuff += '</div>';
-                
-                //if (entity.punchState == 'Punched In') {
-                    estuff += '<div id="' + entity.entTimerId + '" class="TC_StateDuration" timeStart="'+entity.taskStart+'">00:00:00</div>';
-                //}
-                estuff += '</div>';
-
-                $('#TC_Entities').append(estuff);
-
-                TC_Entities.push(entity);
-
-            }
-            $('#TC_Entities').append('<div style="height:50px;"> </div>');
+            var report = response.data.report;
+            spu.consoleLog('getCustomReport:'+reportName+' (tables:'+report.tables.length+')');
         }
         if (callback) {
-            callback(TC_Entities);
+            callback(report);
         }
     });
-
-    return TC_Entities;
+    //return report;
 }
-
-function TC_updateTimerDisplay(timerId, startTime) {
-    if (document.getElementById(timerId)) {
-        var t = document.getElementById(timerId);
-        var tstart = t.getAttribute('timeStart');
-            tstart = startTime;
-            
-        var tnow = new Date();
-            tnow = formatDateTime(tnow);
-
-        var tdiff = datediff(tstart,tnow,'s');
-        
-        var h = tdiff/60/60;
-            h = (h<1 ? 0 : h);
-            h = parseInt(h);
-        var m = ( tdiff - (h*60*60) ) / 60;
-            m = (m<1 ? 0 : m);
-            m = parseInt(m);
-        var s = tdiff - (h*60*60) - (m*60);
-            s = parseInt(s);
-        
-        t.innerHTML = (h<10 ? '0'+h : h)+':'+(m<10 ? '0'+m : m)+':'+(s<10 ? '0'+s : s);
-    }
-}
-function TC_entityTimer(timerId, startTime, op, rate) {
-    if (op=='start') {
-        var intervalId = setInterval(function() {
-            TC_updateTimerDisplay(timerId, startTime);
-        }, rate);
-        spu.consoleLog('Started Entity Timer ('+timerId+') with refresh rate: '+rate+' ms.');
-        return intervalId;
-    } else {
-        clearTimers('TC_entityTimer');
-    }
-}
-
-function TC_updateEmployeeTimers(employees, tasks, callback) {
-    spu.consoleLog('Updating Timeclock Timers ('+employees.length+')');
-    spu.consoleLog('Timeclock Entities: '+employees.length);
-    spu.consoleLog('Timeclock Tasks: '+tasks.length);
-    
-    TC_entityTimer('','', 'stop');
-    
-    var GMToffset = getClientGMToffset();
-    
-    var employees = TC_Entities;
-    var tasks = TC_Tasks;
-    
-    for (var e=0; e<employees.length; e++) {
-        var entity = employees[e];
-
-        spu.consoleLog('Iterating Timeclock Tasks ('+tasks.length+') looking for: '+entity.name);
-
-        for (var t=0; t<tasks.length; t++) {
-
-            var task = tasks[t];
-
-            var startDT = task.startDate.toString(); // 2016-07-30T13:37:44.587Z
-            var startMS = startDT.substr(20,4).replace(/Z/g,'');
-                startMS = (startMS<100 ? (startMS<10 ? '00'+startMS : '0'+startMS) : startMS);
-                startDT = startDT.substr(0,19) + '.' + startMS + GMToffset;
-            var timeStart = startDT;
-
-            var customData = task.customData;
-
-            var taskEntityName = '';
-            var taskId = 0;
-            var taskIdent = '';
-
-            for (var d=0; d<customData.length; d++) {
-                //spu.consoleLog(entity.name + '... CD ['+customData[d].name+']'+customData[d].value);
-                if (customData[d].name == 'entityName') {
-                    taskEntityName = customData[d].value;
-                }
-            }
-
-            if (taskEntityName == entity.name) {
-
-                taskId = task.id;
-                taskIdent = task.identifier;
-                var startDT = task.startDate.toString(); // 2016-07-30T13:37:44.587Z
-                var startMS = startDT.substr(20,4).replace(/Z/g,'');
-                    startMS = (startMS<100 ? (startMS<10 ? '00'+startMS : '0'+startMS) : startMS);
-                    startDT = startDT.substr(0,19) + '.' + startMS + GMToffset;
-                var timeStart = startDT;
-
-                spu.consoleLog('Found Timeclock Task for ('+taskEntityName+'): '+taskIdent+' (ID:'+taskId+')');
-
-                spu.consoleLog(taskEntityName+' Punch Status: '+entity.punchState);
-
-                if (document.getElementById(entity.entTimerId)) {
-                    document.getElementById(entity.entTimerId).setAttribute('timeStart',timeStart);
-                }
-                if (entity.punchState == 'Punched In') {
-                    spu.consoleLog('Starting Entity Timer for: '+taskEntityName);
-                    TC_entityTimer(entity.entTimerId, timeStart, 'start', 1000);
-                } else {
-                    spu.consoleLog('No need to start Entity Timer for: '+taskEntityName);
-                }
-                break;
-            }
-            
-        }
-        
-    }
-    
-    if (callback) {
-        callback(employees, tasks);
-    }
-}
-
-function TC_refreshTimeclockDisplay(entityType,search,callback) {
-    spu.consoleLog("Refreshing Timeclock Display ...");
-    $('#TC_Entities').html('<div class="info-message">Fetching Entities, please Wait...<br /><br />'+busyWheel+'</div>');
-    TC_getTimeclockTasks(TC_PunchTaskType,'false','','','',''
-        , function tcTasks() {
-            TC_refreshEmployeeEntities(entityType, search, '', TC_Tasks
-            , function empTimers() {
-                TC_updateEmployeeTimers(TC_Entities,TC_Tasks
-                , function et(){
-                    $('#REP_Report').empty();
-                    if (callback) {
-                        callback();
-                    }
-                });
-            });
-        }
-    );
-}
-
-
-function updateTaskMessage(msg) {
-    $('#TSK_MSG').html(msg);
-    jumpTop();
-}
-
-function loadTaskTypeList(callback) {
-    if (document.getElementById('TSK_TaskTypePicker')) {
-        TSK_TaskTypes = [];
-        var ttypesstuff = '';
-        getReportVars('GQLM Task Types',function tt(data){
-            taskTypes = data;
-            
-            getReportVars('GQLM Task Type Custom Fields',function cf(cfdata){
-                var ttcf = cfdata;
-                
-                for (var t=0; t<taskTypes.length; t++) {
-                    var taskType = taskTypes[t].name;
-                    
-                    var customFields = [];
-                    for (var c=0; c<ttcf.length; c++) {
-                        var customField = ttcf[c];
-                        if (customField.taskTypeId == taskTypes[t].id) {
-                            customFields.push({name:customField.name,fieldType:customField.fieldType,displayFormat:customField.displayFormat,editingFormat:customField.editingFomat});
-                        }
-                    }
-                    taskTypes[t].customFields = customFields;
-                    
-                    TSK_TaskTypes.push(taskType);
-                    ttypesstuff += '<OPTION VALUE="'+taskType+'">'+taskType+'</OPTION>';
-                }
-
-                $('#TSK_TaskTypePicker').empty();
-                $('#TSK_TaskTypePicker').append(ttypesstuff);
-                
-                if (callback) {
-                    callback(taskTypes);
-                }
-            });
-            
-        });
-    }
-}
-function refreshTaskEditorDisplay(taskType,isCompleted,callback) {
-    if (taskType=='') {
-        taskType = $('#TSK_TaskTypePicker').val();
-    }
-    if (isCompleted=='') {
-        isCompleted = $('#TSK_TaskCompletePicker').val();
-    }
-    
-    $('#TSK_Detail').empty();
-    $('#TSK_Tasks').html('<div class="info-message">Fetching Tasks, please Wait...<br /><br />'+busyWheel+'</div>');
-    updateTaskMessage('');
-    
-    getTaskEditorTasks(taskType,isCompleted,'','','',''
-        , function showTaskEditorTasks() {
-            
-            var tasks = TSK_Tasks;
-            var taskCount = tasks.length;
-            var taskstuff = '';
-            
-            for (var t=0; t<taskCount; t++) {
-                var task = tasks[t];
-                //TSK_Tasks.push('Tasks_' + task.id);
-                
-                taskstuff += '<div class="TSK_Task"';
-                taskstuff += ' id="Tasks_' + task.id + '"';
-                taskstuff += ' ident="' + task.identifier + '"';
-                taskstuff += ' name="' + task.name + '"';
-                taskstuff += ' isSelected="0"';
-                taskstuff += '>';
-                taskstuff += '<span style="font-weight:bold;color:#FFBB00;">' + task.name + '</span>';
-                taskstuff += '<br /><span style="font-size:14px;">' + task.contentText + '</span>';
-                taskstuff += '<br /><span style="font-size:14px;">(' + task.id + ') [' + task.identifier + ']</span>';
-                taskstuff += '</div>';
-            }
-            
-            spu.consoleLog('Displaying Task Editor Tasks: '+taskCount);
-            
-            $('#TSK_Tasks').empty();
-            $('#TSK_Tasks').append(taskstuff);
-            
-            // shim for iPad scrolling
-            //touchScroll('TSK_Tasks');
-            $('#TSK_Tasks').append('<div style="height:80px;"> </div>');
-            
-            $('#TSK_Detail').empty();
-
-            if (taskCount>0) {
-                updateTaskMessage('Select a Task to display details.');
-            } else {
-                updateTaskMessage('');
-                $('#TSK_Tasks').html('<div class="info-message" style="text-align:left;">No Tasks of selected Type/Completion.<br /><br />Select a different Type/Completion, or<br /><br />Click New to add a new Task.</div>');
-            }
-
-
-            if (callback) {
-                callback();
-            }
-        });
-}
-
-
 
 function setReportFilterDefaults(callback) {
     $('#REP_DateStart').val(monthStart);
@@ -2123,380 +1078,276 @@ function displayReport(report) {
     }
 }
 
-function TE_changeTicketExplorerFilters(parm, callback) {
 
-    $('#TE_DisplayTicket').hide();
 
-    var filterParm = '#'+parm;
-    var filterVal  = $(filterParm).val();
+////////////////////////////
+//
+// TASKS
+//
+////////////////////////////
 
-    if (filterParm == '#REP_PeriodPicker') {
-        switch (filterVal) {
-            case 'Today':
-                $('#REP_DateStart').val(today);
-                $('#REP_DateEnd').val(tomorrow);
-                //$('#REP_PeriodPicker').val('ignore');
-                break;
-            case 'Yesterday':
-                $('#REP_DateStart').val(yesterday);
-                $('#REP_DateEnd').val(today);
-                //$('#REP_PeriodPicker').val('ignore');
-                break;
-            case 'This Week':
-                $('#REP_DateStart').val(weekStart);
-                $('#REP_DateEnd').val(weekEnd);
-                //$('#REP_PeriodPicker').val('ignore');
-                break;
-            case 'Past Week':
-                $('#REP_DateStart').val(weekPastStart);
-                $('#REP_DateEnd').val(weekPastEnd);
-                //$('#REP_PeriodPicker').val('ignore');
-                break;
-            case 'This Month':
-                $('#REP_DateStart').val(monthStart);
-                $('#REP_DateEnd').val(monthEnd);
-                //$('#REP_PeriodPicker').val('ignore');
-                break;
-            case 'Past Month':
-                $('#REP_DateStart').val(monthPastStart);
-                $('#REP_DateEnd').val(monthPastEnd);
-                //$('#REP_PeriodPicker').val('ignore');
-                break;
-            case 'This Year':
-                $('#REP_DateStart').val(yearStart);
-                $('#REP_DateEnd').val(yearEnd);
-                //$('#REP_PeriodPicker').val('ignore');
-                break;
-            case 'Past Year':
-                $('#REP_DateStart').val(yearPastStart);
-                $('#REP_DateEnd').val(yearPastEnd);
-                //$('#REP_PeriodPicker').val('ignore');
-                break;
-            case 'ignore':
-                $('#REP_PeriodPicker').val('ignore');
-                break;
-        }
-    }
-
-    //if (startDate=='') {
-        var startDate = $('#REP_DateStart').val();
-    //}
-    //if (endDate=='') {
-        var endDate = $('#REP_DateEnd').val();
-    //}
-    //if (filterParm == '#TE_OpenClosed')
-        var isClosed = $('#TE_OpenClosed').val();
-    //}
-    //if (filterParm == '#TE_Sort')
-        var orderBy = $('#TE_Sort').val();
-    //}
-
-    $('#TE_Tickets').html('<div class="info-message">Fetching Tickets, please Wait...<br /><br />'+busyWheel+'</div>');
-    TE_getTicketExplorerTickets(startDate,endDate,isClosed,orderBy,'' ,''  , function gt(tickets){
-        TE_Tickets = tickets;
-        TE_refreshTicketExplorerTicketList(TE_Tickets);
-    });
-
-}
-
-function TE_getTicketExplorerTickets(startDate,endDate,isClosed,orderBy,take,skip, callback) {
-
-    if (startDate=='') {
-        startDate = $('#REP_DateStart').val();
-    }
-    if (endDate=='') {
-        endDate = $('#REP_DateEnd').val();
-    }
-    if (isClosed=='') {
-        isClosed = $('#TE_OpenClosed').val();
-    }
-    if (orderBy=='') {
-        orderBy = $('#TE_Sort').val();
-    }
-    
-    take = '';
-    skip = '';
-    
-    gql.EXEC(gql.getTickets(startDate,endDate,isClosed,orderBy,take,skip), function(response) {
+function getTasks(taskType, startFilter, endFilter, completedFilter, nameLike, contentLike, fieldFilter, stateFilter, callback) {
+    var fn = spu.fi(arguments);
+    var startTime='';
+    gql.EXEC(gql.getTasks2(taskType, startFilter, endFilter, completedFilter, nameLike, contentLike, fieldFilter, stateFilter), function(response) {
         if (response.errors) {
-            gql.handleError("TE_getTicketExplorerTickets", response.errors);
-            if (callback) {
-                callback('ERROR');
-            }
+            gql.handleError(fn+" gql.getTasks2", response);
+            callback('ERROR');
         } else {
-            var tickets = response.data.tickets;
-            spu.consoleLog('Got Tickets: '+tickets.length);
-            if (callback) {
-                callback(tickets);
-            }
+            var tasks = response.data.tasks;
+            spu.consoleLog('Got Tasks: '+tasks.length);
         }
-
+        if (callback) {
+            callback(tasks);
+        }
     });
 }
 
-function TE_refreshTicketExplorerTicketList(tickets, callback) {
+function addTasks(taskTypes,taskNames,content,isCompleted,userName,customData,state, confirm, callback) {
+    var fn = spu.fi(arguments);
+    if (confirm !== false) {
+        gql.EXEC(gql.addTasks(taskTypes,taskNames,content,isCompleted,userName,customData,state), function (response) {
+            if (response.errors) {
+                gql.handleError(fn+" gql.addTasks", response);
+            } else {
+                spu.consoleLog("addTasks Type("+taskTypes+') Name['+taskNames+'] State('+state+') Completed('+isCompleted+')');
+            }
+            if (callback) {
+                //callback(TC_Tasks);
+                callback(response);
+            }
+        });
+    } else {
+        if (callback) {
+            callback(TC_Tasks);
+        }
+    }
+}
+function updateTasks(taskTypes, taskIDs, taskIdents, isCompleted, state, customData, content, name, confirm, callback) {
+    var fn = spu.fi(arguments);
+    if (confirm !== false) {
+        gql.EXEC(gql.updateTask(taskTypes, taskIDs, taskIdents, isCompleted, state, customData, content, name), function (response) {
+            if (response.errors) {
+                gql.handleError(fn+" gql.updateTask", response);
+            } else {
+                spu.consoleLog("updateTasks Type("+taskTypes+') id['+taskIDs+'] ident['+taskIdents+'] State('+state+') Completed('+isCompleted+')');
+            }
+            if (callback) {
+                callback(response);
+            }
+        });
+    } else {
+        if (callback) {
+            callback();
+        }
+    }
+}
 
-    $('#TE_Ticket').empty();
-    $('#TE_Tickets').empty();
+function updateTasksByIdentifier(taskTypes, taskIdents, isCompleted, state, customData, content, confirm, callback) {
+    var fn = spu.fi(arguments);
+    if (confirm !== false) {
+        gql.EXEC(gql.updateTaskByIdentifier(taskTypes, taskIdents, isCompleted, state, customData, content), function (response) {
+            if (response.errors) {
+                gql.handleError(fn+" gql.updateTaskByIdentifier", response);
+            } else {
+                spu.consoleLog("updateTasksByIdentifier Type("+taskTypes+') ident['+taskIdents+'] State('+state+') Completed('+isCompleted+')');
+            }
+            if (callback) {
+                callback(TC_Tasks);
+            }
+        });
+    } else {
+        if (callback) {
+            callback(TC_Tasks);
+        }
+    }
+}
+function updateTaskStateByIdentifier(taskTypes, taskIdents, state, stateDate, callback) {
+    var fn = spu.fi(arguments);
+    gql.EXEC(gql.updateTaskStateByIdentifier(taskTypes, taskIdents, state, stateDate), function (response) {
+        if (response.errors) {
+            gql.handleError(fn+" gql.updateTaskStateByIdentifier", response);
+        } else {
+        }
+        if (callback) {
+            callback(TC_Tasks);
+        }
+    });
+}
+function deleteTasks(taskIDs, confirm, callback) {
+    var fn = spu.fi(arguments);
+    if (confirm !== false) {
+        gql.EXEC(gql.deleteTask(taskIDs), function (response) {
+            if (response.errors) {
+                gql.handleError(fn+" gql.deleteTask", response);
+            } else {
+                spu.consoleLog('deleteTasks id['+taskIDs+']');
+            }
+            if (callback) {
+                callback(response);
+            }
+        });
+    } else {
+        if (callback) {
+            callback();
+        }
+    }
+}
+
+function postTaskRefreshMessage(taskIDs, callback) {
+    spu.consoleLog('Posting Task Refresh Message...');
+    gql.EXEC(gql.postTaskRefreshMessage(taskIDs), callback);
+}
+
+function calculateTaskDuration() {
+    var start = document.getElementById('taskStart').value;
+    var end   = document.getElementById('taskEnd').value;
     
-    for (var t=0; t<tickets.length; t++){
-        var tStuff = '';
+    var hours = datediff(start,end,'h').toFixed(2);
+    var mins  = datediff(start,end,'m').toFixed(2);
+    var secs  = datediff(start,end,'s').toFixed(2);
 
-        var ticket = tickets[t];
-        var tEntities = ticket.entities;
-        var tStates = ticket.states;
-        var tTags = ticket.tags;
-        
-        var timeOffset = getClientGMToffset().split(':');
-        var offsetHours = Number(timeOffset[0]);
-            offsetHours = offsetHours + Number(timeOffset[1])/60;
-            //offsetHours = offsetHours * -1;
-            offsetHours = 0;
-        var elemDate = moment(ticket.date, dateFormats).add(offsetHours,'hours').format('YYYY-MM-DD HH:mm');
-        
-        //tStuff += '<div>'+ticket.uid+'</div>';
-        tStuff += '<div style="color:Orange;font-weight:bold;">#'+ticket.number+' (ID:'+ticket.id+') ['+ticket.type+']</div>';
-        tStuff += '<div>'+elemDate+'</div>';
-        tStuff += '<div>TTL:<b>'+ticket.totalAmount.toFixed(2)+'</b> Rem:'+ticket.remainingAmount.toFixed(2)+'</div>';
+    var out = hours+' h / ' + mins+' m / ' + secs+' s';
+    
+    document.getElementById('taskDuration').value = out;
+    return out;
+}
 
-        if (tEntities) {
-            var entStuff = '';
-            for (var te=0; te<tEntities.length; te++) {
-                var entity = tEntities[te];
-                entStuff += '<div class="TE_ticketEntity"><b>'+entity.type.substr(0,(entity.type.length-1))+'</b>: '+entity.name+'</div>';
-            }
-            tStuff += entStuff;
-        }
-        
-        if (tStates) {
-            var tsStuff = '';
-            for (var ts=0; ts<tStates.length; ts++) {
-                var tState = tStates[ts];
-                tsStuff += '<div class="TE_ticketState"><b>'+tState.stateName+'</b>: '+tState.state+'</div>';
-            }
-            tStuff += tsStuff;
-        }
-        
-        if (tTags) {
-            var ttStuff = '';
-            for (var tt=0; tt<tTags.length; tt++) {
-                var tTag = tTags[tt];
-                ttStuff += '<div class="TE_ticketTag"><b>'+tTag.tagName+'</b>: '+tTag.tag.replace(/\\r/g,'')+'</div>';
-            }
-            tStuff += ttStuff;
-        }
+function updateTaskMessage(msg) {
+    $('#TSK_MSG').html(msg);
+    jumpTop();
+}
+
+function loadTaskTypeList(callback) {
+    if (document.getElementById('TSK_TaskTypePicker')) {
+        TSK_TaskTypes = [];
+        var ttypesstuff = '';
+        getReportVars('GQLM Task Types','', function tt(data){
+            taskTypes = data;
+            
+            getReportVars('GQLM Task Type Custom Fields','', function cf(cfdata){
+                var ttcf = cfdata;
                 
-        $('#TE_Tickets').append('<div id="Tickets_'+ticket.uid+'" class="TE_TicketPreview">'+tStuff+'</div>');
-
-    } // tickets
-    
-    if (tickets.length==0) {
-        $('#TE_Tickets').html('<div class="info-message" style="text-align:left;">No Tickets in specified Date Range that meet the Filter Criteria.<br /><br />Select a different Date Range and/or Filter Criteria.</div>');
-    }
-    
-    if (callback) {
-        callback(tickets);
-    }
-}
-function TE_displayTicketExplorerTicket(ticketUid) {
-
-    $('#TE_DisplayTicket').hide();
-
-    $('#TE_Ticket').empty();
-    
-    ticketUid = ticketUid.replace(/Tickets_/g,'');
-    
-    for (var t=0; t<TE_Tickets.length; t++){
-        if (ticketUid == TE_Tickets[t].uid) {
-            var ticket = TE_Tickets[t];
-            break;
-        }
-    }
-
-    if (ticket) {
-        var tEntities = ticket.entities;
-        var tStates = ticket.states;
-        var tTags = ticket.tags;
-
-        var timeOffset = getClientGMToffset().split(':');
-        var offsetHours = Number(timeOffset[0]);
-            offsetHours = offsetHours + Number(timeOffset[1])/60;
-            //offsetHours = offsetHours * -1;
-            offsetHours = 0;
-        var elemDate = moment(ticket.date, dateFormats).add(offsetHours,'hours').format('YYYY-MM-DD HH:mm');
-            
-        var tStuff = '';
-        tStuff += '<div class="TE_TicketHeader">';
-        tStuff += '<div style="color:Orange;font-weight:bold;">#'+ticket.number+' (ID:'+ticket.id+') ['+ticket.type+']</div>';
-        tStuff += '<div>'+elemDate+'</div>';
-        tStuff += '<div>TTL:<b>'+ticket.totalAmount.toFixed(2)+'</b> Rem:'+ticket.remainingAmount.toFixed(2)+'</div>';
-
-        if (tEntities) {
-            var entStuff = '';
-            for (var te=0; te<tEntities.length; te++) {
-                var entity = tEntities[te];
-                entStuff += '<div class="TE_ticketEntity"><b>'+entity.type.substr(0,(entity.type.length-1))+'</b>: '+entity.name+'</div>';
-            }
-            tStuff += entStuff;
-        }
-        
-        if (tStates) {
-            var tsStuff = '';
-            for (var ts=0; ts<tStates.length; ts++) {
-                var tState = tStates[ts];
-                tsStuff += '<div class="TE_ticketState"><b>'+tState.stateName+'</b>: '+tState.state+'</div>';
-            }
-            tStuff += tsStuff;
-        }
-        
-        if (tTags) {
-            var ttStuff = '';
-            for (var tt=0; tt<tTags.length; tt++) {
-                var tTag = tTags[tt];
-                ttStuff += '<div class="TE_ticketTag"><b>'+tTag.tagName+'</b>: '+tTag.tag.replace(/\\r/g,'')+'</div>';
-            }
-            tStuff += ttStuff;
-        }
-
-        tStuff += '</div>'; // TE_TicketHeader
-        
-        var orders = ticket.orders;
-        var oStuff = '';
-        for (var o=0; o<orders.length; o++){
-            var order = orders[o];
-            var oStates = order.states;
-            var oTags = order.tags;
-            // id,uid,productId,calculatePrice,decreaseInventory,increaseInventory
-
-            order.priceTotal = (order.price*order.quantity);
-            
-            for (var ot=0; ot<oTags.length; ot++){
-                var oTag = oTags[ot];
-                if (oTag.price!=0) {
-                    order.priceTotal = order.priceTotal + (oTag.price*oTag.quantity);
-                }
-            } // orderTags
-
-            for (var os=0; os<oStates.length; os++){
-                var oState = oStates[os];
-                if (oState.state=='Gift') {
-                    order.priceTotal = 'FREE';
-                    break;
-                } else if (oState.state=='Void') {
-                    order.priceTotal = 'VOID';
-                    break;
-                } else {
-                    order.priceTotal = Number(order.priceTotal).toFixed(2);
-                }
-            } // orderStates
-
-            oStuff += '<div class="TE_orderContainer">';
-            oStuff += '<div class="TE_orderLine">';
-            oStuff += '<div class="TE_orderQuantity">'+order.quantity+'</div>';
-            oStuff += '<div class="TE_orderName">'+order.name+' <div class="TE_orderPortion"> ('+order.portion+')</div>'+'</div>';
-            oStuff += '<div class="TE_orderPriceTag">'+(order.priceTag==null || order.priceTag=='' ? 'REG' : order.priceTag)+'</div> ';
-            oStuff += '<div class="TE_orderPrice">'+order.price.toFixed(2)+'</div>';
-            oStuff += '<div class="TE_orderLineTotal'+(isNumeric(order.priceTotal) ? '' : ' TE_'+order.priceTotal)+'">'+order.priceTotal+'</div>';
-
-            oStuff += '</div>'; // TE_orderLine
-
-            var oStateStuff = '<div class="TE_orderState">';
-            for (var os=0; os<oStates.length; os++){
-                var oState = oStates[os];
-                //oStateStuff += '<div>'+oState.stateName+'</div>';
-                oStateStuff += oState.state+(os<(oStates.length-1) ? ',' : '');
-                //oStateStuff += '<div>'+oState.stateValue+'</div>';
-                if (oState.state=='Gift') {
+                for (var t=0; t<taskTypes.length; t++) {
+                    var taskType = taskTypes[t].name;
                     
+                    var customFields = [];
+                    for (var c=0; c<ttcf.length; c++) {
+                        var customField = ttcf[c];
+                        if (customField.taskTypeId == taskTypes[t].id) {
+                            customFields.push({name:customField.name,fieldType:customField.fieldType,displayFormat:customField.displayFormat,editingFormat:customField.editingFomat});
+                        }
+                    }
+                    taskTypes[t].customFields = customFields;
+                    
+                    TSK_TaskTypes.push(taskType);
+                    ttypesstuff += '<OPTION VALUE="'+taskType+'">'+taskType+'</OPTION>';
                 }
-            } // orderStates
-            oStateStuff += '</div>'; // TE_orderState
-            oStuff += oStateStuff;
 
-            var oTagStuff = '<div class="TE_orderTag">';
-            for (var ot=0; ot<oTags.length; ot++){
-                var oTag = oTags[ot];
-                oTagStuff += (oTag.quantity==1?'&nbsp;&nbsp;':oTag.quantity+'x');
-                //oTagStuff += '<div>'+oTag.tagName+'</div>';
-                oTagStuff += '&nbsp;'+oTag.tag;
-                oTagStuff += (oTag.price==0?'':' ... '+oTag.price.toFixed(2));
-                oTagStuff += (oTag.price==0?'':' ... '+(oTag.price*oTag.quantity).toFixed(2));
-                //oTagStuff += '<div>'+oTag.rate+'</div>';
-                //oTagStuff += '<div>'+oTag.userId+'</div>';
-                oTagStuff += '<br />';
-            } // orderTags
-            oTagStuff += '</div>'; // TE_orderTag
-            oStuff += oTagStuff;
-
-            oStuff += '</div>'; // TE_orderContainer
-        } // orders
-
-        $('#TE_Ticket').append('<div id="TicketExplorerTicket" class="TE_TicketCard" ticketId="'+ticket.id+'">'+tStuff+oStuff+'</div>');
-        
-        if (inSambaPOS) {
-            $('#TE_DisplayTicket').show();
-        }
-        
-    }
-}
-function TE_displayTicketExplorerTicketinSambaPOS() {
-    if (inSambaPOS) {
-        var name = 'HUB Display Ticket in SambaPOS';
-        var value = $('#TicketExplorerTicket').attr('ticketId');
-        spu.executeAutomationCommand(name,value);
-    }
-}
-
-
-function POS_refreshPOSDisplay(callback) {
-
-    POS_getEntitySelectors();
-
-    if (amcBtns_ticketCommands.length == 0) {
-        POS_amcButtonsGet(function but(data){
-            // render the Buttons
-            POS_amcButtonsRender('ticketCommands');
-            POS_amcButtonsRender('orderCommands');
-            POS_amcButtonsRender('ticketRow1');
-            POS_amcButtonsRender('ticketRow2');
-        });
-    } else {
-        // render the Buttons
-        POS_amcButtonsRender('ticketCommands');
-        POS_amcButtonsRender('orderCommands');
-        POS_amcButtonsRender('ticketRow1');
-        POS_amcButtonsRender('ticketRow2');
-    }
-
-    $('#entityGrids').empty();
-    for (var e=0;e<POS_EntityTypes.length; e++) {
-        var et  = POS_EntityTypes[e];
-        var ets = et.substr(0,et.length-1);
-
-        POS_fillEntityGrid(et);
-
-        POS_Ticket[ets] = (typeof POS_Ticket[ets]==='undefined' ? '' : POS_Ticket[ets]);
-
-        $('#select'+et).html(ets+'<br /><b style="color:#55FF55">'+(POS_Ticket[ets]!='' ? POS_Ticket[ets] : '&nbsp;')+'</b>');
-
-    }
-
-    if (!POS_Menu.selectedCategoryDivId) {
-        POS_getMenu(menuName, function m(menu){
-            POS_Menu = menu;
-            POS_getCategories(POS_Menu, function c(selectedCategoryDivId){
-                $('#'+selectedCategoryDivId).click();
+                $('#TSK_TaskTypePicker').empty();
+                $('#TSK_TaskTypePicker').append(ttypesstuff);
+                
+                if (callback) {
+                    callback(taskTypes);
+                }
             });
-        });
-    } else {
-        POS_getCategories(POS_Menu, function c(selectedCategoryDivId){
-            document.getElementById(selectedCategoryDivId).click();
-            $('#'+selectedCategoryDivId).click();
+            
         });
     }
+}
 
-    if (callback) {
-        callback(POS_Menu);
+function getTaskEditorTasks(taskType,completedFilter,nameLike,contentLike,fieldFilter, state, callback) {
+    var fn = spu.fi(arguments);
+    var timeOffset = getClientGMToffset().split(':');
+    var offsetHours = Number(timeOffset[0]);
+        offsetHours = offsetHours + Number(timeOffset[1])/60;
+
+    gql.EXEC(gql.getTasks(taskType,completedFilter,nameLike,contentLike,fieldFilter, state), function(response) {
+        if (response.errors) {
+            gql.handleError(fn+" gql.getTasks", response);
+            callback('ERROR');
+        } else {
+            TSK_Tasks = [];
+            var tasks = response.data.tasks;
+            spu.consoleLog('Got Task Editor Tasks: '+tasks.length);
+            for (var t=0; t<tasks.length; t++) {
+                
+                // GQL getTasks returns start/end dates with the client TZ-offset already applied, 
+                // not the actual dates as found in the DB, so we need to backout the offset
+                var beg = tasks[t].startDate.replace(/Z/g,'');
+                var end = tasks[t].endDate.replace(/Z/g,'');
+
+                beg = moment(beg, dateFormats).add(offsetHours,'hours').format('YYYY-MM-DDTHH:mm:ss.SSSZ');
+                end = moment(end, dateFormats).add(offsetHours,'hours').format('YYYY-MM-DDTHH:mm:ss.SSSZ');
+                
+                tasks[t].startDate = beg;
+                tasks[t].endDate =  end;
+            }
+            TSK_Tasks = tasks;
+        }
+        if (callback) {
+            callback(TSK_Tasks);
+        }
+    });
+    return TSK_Tasks;
+}
+
+function refreshTaskEditorDisplay(taskType,isCompleted,callback) {
+    if (taskType=='') {
+        taskType = $('#TSK_TaskTypePicker').val();
     }
+    if (isCompleted=='') {
+        isCompleted = $('#TSK_TaskCompletePicker').val();
+    }
+    
+    $('#TSK_Detail').empty();
+    $('#TSK_Tasks').html('<div class="info-message">Fetching Tasks, please Wait...<br /><br />'+busyWheel+'</div>');
+    updateTaskMessage('');
+    
+    getTaskEditorTasks(taskType,isCompleted,'','','',''
+        , function showTaskEditorTasks() {
+            
+            var tasks = TSK_Tasks;
+            var taskCount = tasks.length;
+            var taskstuff = '';
+            
+            for (var t=0; t<taskCount; t++) {
+                var task = tasks[t];
+                //TSK_Tasks.push('Tasks_' + task.id);
+                
+                taskstuff += '<div class="TSK_Task"';
+                taskstuff += ' id="Tasks_' + task.id + '"';
+                taskstuff += ' ident="' + task.identifier + '"';
+                taskstuff += ' name="' + task.name + '"';
+                taskstuff += ' isSelected="0"';
+                taskstuff += '>';
+                taskstuff += '<span style="font-weight:bold;color:#FFBB00;">' + task.name + '</span>';
+                taskstuff += '<br /><span style="font-size:14px;">' + task.contentText + '</span>';
+                taskstuff += '<br /><span style="font-size:14px;">(' + task.id + ') [' + task.identifier + ']</span>';
+                taskstuff += '</div>';
+            }
+            
+            spu.consoleLog('Displaying Task Editor Tasks: '+taskCount);
+            
+            $('#TSK_Tasks').empty();
+            $('#TSK_Tasks').append(taskstuff);
+            
+            // shim for iPad scrolling
+            //touchScroll('TSK_Tasks');
+            $('#TSK_Tasks').append('<div style="height:80px;"> </div>');
+            
+            $('#TSK_Detail').empty();
 
+            if (taskCount>0) {
+                updateTaskMessage('Select a Task to display details.');
+            } else {
+                updateTaskMessage('');
+                $('#TSK_Tasks').html('<div class="info-message" style="text-align:left;">No Tasks of selected Type/Completion.<br /><br />Select a different Type/Completion, or<br /><br />Click New to add a new Task.</div>');
+            }
+
+
+            if (callback) {
+                callback();
+            }
+        });
 }
