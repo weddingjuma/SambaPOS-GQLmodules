@@ -39,7 +39,7 @@ var msgsrv = webHost;
 
 // GraphQL server
 var GQLhost = msgsrv;
-var GQLport = '9898'; // generally, this is the only parameter that might need to change
+var GQLport = '9000'; // generally, this is the only parameter that might need to change
 var GQLpath = '/api/graphql/';
 var GQLurl  = webProto + '//' + GQLhost + ':' + GQLport + GQLpath;
 
@@ -52,31 +52,37 @@ var SIGNALRurl  = webProto + '//' + SIGNALRhost + ':' + SIGNALRport + SIGNALRpat
 var SIGNALRhub  = webProto + '//' + SIGNALRhost + ':' + SIGNALRport + SIGNALRhubs;
 
 
-// the Favorite icon, the icon in the top-left, and an animated spinner
-var favico    = 'images/icons/favicon.ico';
-var icon      = 'images/icons/favicon-blue.png';
-var busyWheel = '<img src="images/progresswheel.gif" alt="please wait" />';
+// set default User and Terminal to use if Authentication is Bypassed
+var defaultUser = 'Admin';
+var defaultTerminal = 'Server';
+
+// static settings for Terminal and User, will be overwritten if Authentication is activated
+var currentUser     = defaultUser;
+var currentTerminal = defaultTerminal;
+    
+// User PIN Authentication settings
+// If allowBypass and bypassAllAuth or bypassIPs matched,
+// then defaultUesr will be used to Authenticate,
+// UNLESS the user EXPLICITLY Logs Out using the Logout link on the TerminalInfo screen.
+// If the user EXPLICITLY Logs Out, then Authentication will validate against an entered PIN.
+var allowAuthBypass = true;  // allow Bypass of Authentication
+var bypassAllAuth = false;   // Bypass ALL Authentication.  If set to true then defaultUser will be used to Authenticate, UNLESS the user EXPLICITLY Logs Out.
+var bypassIPs = [];          // if not Bypassing ALL Authentication, list the IPs that are allowed to bypass Authentication.
+    // if one of listed IPs are matched, then defaultUser will be used to Authenticate, UNLESS the user EXPLICITLY Logs Out.
+    bypassIPs.push('::1'); // localhost IPv6
+    bypassIPs.push('127.0.0.1'); // localhost IPv4
 
 
-// these defaults will be overwritten by values set in Server Terminal Rule Automation (BUS_ Rules)
-// (if it is set up), and they are used only in the Customer Display Module
-var businessName   = 'My Awesome Restaurant'; // not currently used
-var venueName      = 'My Awesome Restaurant';
-var welcomeMessage = 'Welcome to';
-var openMessage    = 'We are Open!';
-var closedMessage  = 'We are Closed.';
 
 
-// define your number thousands separator and decimal separator
-// used as part of isNumeric detection, mainly for Reports Module
-var sepThousand = ',';
-var sepDecimal  = '.';
-
+//
+// Module Settings
+//
 
 // you can change the location of the Modules and set this variabe to match
 var modulePath = 'modules/';
 
-// control which Modules are available
+// control which Modules are available, and the order in which they appear on the Main Menu
 var availableModules = [];
     availableModules.push('Customer Display');
     availableModules.push('Kitchen Display');
@@ -92,43 +98,27 @@ var availableModules = [];
 // set default Module if no module is supplied in the URL
 var module = 'main_menu';
 
-
-// set default User and Terminal to use if Authentication is Bypassed
-var defaultUser = 'Admin';
-var defaultTerminal = 'Server';
-
-
-// static settings for Terminal and User, will be overwritten if Authentication is activated
-var currentUser     = defaultUser;
-var currentTerminal = defaultTerminal;
-    
-
-// User Authentication settings
-var allowAuthBypass = true;  // allow Bypass of Authentication
-var bypassAllAuth = false;   // Bypass ALL Authentication
-var bypassIPs = [];          // if not Bypassing ALL Authentication, list the IPs that are allowed to bypass Authentication
-    bypassIPs.push('::1');
-    bypassIPs.push('127.0.0.1');
-    bypassIPs.push('192.168.1.190');
-    bypassIPs.push('192.168.0.4');
-    bypassIPs.push('192.168.0.5');
-    //bypassIPs.push('192.168.0.72');
-    bypassIPs.push('192.168.1.197');
-
-
+// Customer Display
+var CD_ChangeDueTimeOut = 15000; // milliseconds to display Change Due
+// these defaults will be overwritten by values set in Server Terminal Rule Automation (BUS_ Rules) (if it is set up), and they are used only in the Customer Display Module
+var CD_businessName   = 'My Awesome Restaurant'; // not currently used
+var CD_venueName      = 'My Awesome Restaurant';
+var CD_welcomeMessage = 'Welcome to';
+var CD_openMessage    = 'We are Open!';
+var CD_closedMessage  = 'We are Closed.';
 
 // POS
 var menuName        = 'Menu';
 var departmentName  = 'Restaurant';
 var ticketTypeName  = 'Ticket';
 var POS_EntityTypes = ['Tables','Customers'];
-
+var POS_EntityTypesAuto = false; // override static Entity Types above with automatic Ticket Type Entity Types
+var POS_PrintJobs   = ['Print Bill','Print Orders to Kitchen Printer'];
 
 // Kitchen Display
 var KD_HTMLtaskType = 'KD Task - Food';     // the KD Module works with this Task Type
 var KD_GUItaskType  = 'KD Task GUI - Food'; // optionally update the Task Type used in Custom Entity Screen using Task Editor Widgets
 var KD_interop      = false;                // if you don't have a GUItaskType, set this to false
-
 
 // Timeclock
 var TC_EntityType           = 'Employees';
@@ -137,6 +127,22 @@ var TC_PunchTaskType        = 'TC Punch Task';
 var TC_PunchControlTaskType = 'TC Punch Control Task';
 var TC_PolicyTaskType       = 'TC Policy Task';
 
+
+
+// the Favorite icon, the icon in the top-left, and an animated spinner
+var favico    = 'images/icons/favicon.ico';
+var icon      = 'images/icons/favicon-blue.png';
+var busyWheel = '<img src="images/progresswheel.gif" alt="please wait" />';
+
+
+//
+// Locale/Regional/Language Settings
+//
+
+// define your number thousands separator and decimal separator
+// used as part of isNumeric detection, mainly for Reports Module
+var sepThousand = ',';
+var sepDecimal  = '.';
 
 // Dates and Times
 // allowable date/time formats to help the moment.js library
