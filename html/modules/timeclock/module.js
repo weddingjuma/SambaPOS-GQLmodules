@@ -3,10 +3,21 @@
 // nav_timeclock
 //
 ////////////////////////////////
-function init_nav() {
-    // do some stuff
+spu.consoleLog('Loading Module JS for: '+module.replace(/_/,' ').toUpperCase()+' ...');
+
+function init_module() {
+    spu.consoleLog('Initializing Module JS for: '+module.replace(/_/,' ').toUpperCase()+' ...');
+    
+    if (customReports.length<1) {
+        getReportVars('GQLM Custom Reports','', function rl(data){
+            customReports = data;
+            TC_refreshTimeclockDisplay(TC_EntityType,TC_EntitySearch);
+        });
+    } else {
+        TC_refreshTimeclockDisplay(TC_EntityType,TC_EntitySearch);
+    }
+    setReportFilterDefaults();
 }
-spu.consoleLog('Initializing '+module.replace(/_/,' ').toUpperCase()+' ...');
 
 $('#TC_Entities').on('click', '.TC_Entity', function(){
     var entityButton = this.id; // Employees_Jenery, Employees_Ovania, ...
@@ -52,6 +63,9 @@ $('#TC_Entities').on('click', '.TC_Entity', function(){
             reportHeadersD = [];
             reportHeadersS = [];
 
+
+            $('#REP_Report').html('<br /><br /><div class="info-message">... Generating Report ...<br /><br />'+busyWheel+'</div>');
+                
             for (var e=0; e<customReports.length; e++) {
                 if (customReports[e]["name"] == 'TC Employee Hours') {
                     parseReportHeaderRows(customReports[e]["template"]);
@@ -59,16 +73,14 @@ $('#TC_Entities').on('click', '.TC_Entity', function(){
                 }
             }
                 
-            //getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters);
-            $('#REP_Report').empty();
-            $('#REP_Report').append('<br /><br /><div class="info-message">... Generating Report ...<br /><br />'+busyWheel+'</div>');
 
 
                 
+            //getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters);
             getCustomReport('TC Employee Hours',currentUser,reportPeriod,reportStart,reportEnd, parameters, function getRep(report) {
-                    displayReport(report);
-                }
-            );
+                displayReport(report);
+            });
+            
         } else {
             document.getElementById(entityButton).style.borderColor = '';
             spu.consoleLog('DE-Selected TC Entity: '+entityName);
@@ -298,7 +310,7 @@ function updateEmployeePunchState(entityButtonId,cmdButton,callback) {
                             addTasks(punchControlTaskTypes, entityNames, punchControlContent, false, currentUser, customDataPunchControl, 'Punch Cycle', addControlTask, function addC() {
 
                                 spu.consoleLog('Updating Entity Punch State: ' + punchStateCurrent + ' > ' + punchStateNew);
-                                updateEntityState('Employees',entityName,'TC Punch Status',punchStateNew,function es(){
+                                TC_updateEntityState('Employees',entityName,'TC Punch Status',punchStateNew,function es(){
                                     var msg = '{"eventName":"TIMECLOCK_REFRESH","terminal":"'+currentTerminal+'","userName":"'+currentUser+'","sid":"'+sessionId+'"}';
                                     broadcastMessage(msg);
                                     if (callback) {
@@ -347,7 +359,7 @@ function updateEmployeePunchState(entityButtonId,cmdButton,callback) {
                             addTasks(punchControlTaskTypes, entityNames, punchControlContent, false, currentUser, customDataPunchControl, 'Punch Cycle', addControlTask, function addC() {
 
                                 spu.consoleLog('Updating Entity Punch State: ' + punchStateCurrent + ' > ' + punchStateNew);
-                                updateEntityState('Employees',entityName,'TC Punch Status',punchStateNew,function es(){
+                                TC_updateEntityState('Employees',entityName,'TC Punch Status',punchStateNew,function es(){
                                     var msg = '{"eventName":"TIMECLOCK_REFRESH","terminal":"'+currentTerminal+'","userName":"'+currentUser+'","sid":"'+sessionId+'"}';
                                     broadcastMessage(msg);
                                     if (callback) {
@@ -373,4 +385,327 @@ function updateEmployeePunchState(entityButtonId,cmdButton,callback) {
 //    if (callback) {
 //        callback(entityButtonId);
 //    }
+}
+
+
+
+function TC_refreshEmployeeEntities(entityType, search, stateFilter, tasks, callback){
+    var fn = spu.fi(arguments);
+    // singular name of entityType
+    var eType = entityType.substr(0,entityType.length-1);
+    
+    var GMToffset = getClientGMToffset();
+    
+    gql.EXEC(gql.getEntities(entityType, search, stateFilter), function(response) {
+        if (response.errors) {
+            gql.handleError(fn+" gql.getEntities", response);
+        } else {
+            spu.consoleLog('TC_refreshEmployeeEntities:'+entityType+' ('+response.data.entities.length+')');
+            
+            var entities = response.data.entities;
+
+//            $('#TC_Entities').empty();
+
+            jsonData = entities;
+            jsonData = sortJSON(jsonData,"name",true);
+            
+            TC_Entities = [];
+
+            var estuff = '';
+            
+            for (var e=0; e<entities.length; e++) {
+                
+                var entity = entities[e];
+
+                for (var s=0; s<entity.states.length; s++) {
+                    var ST = entity.states[s];
+                    if (ST.stateName=="TC Punch Status") {
+                        entity.punchState = ST.state;
+                        entity.punchStateClass = 'TC_' + ST.state.replace(/ /g,'_');
+                        //spu.consoleLog(entity.type+":"+entity.name+" Status State:"+ST.state+entity.statusState);
+                    }
+                }
+                
+                var payRates = '';
+                
+                for (var c=0; c<entity.customData.length; c++) {
+                    var cd = entity.customData[c];
+                    if (cd.name.indexOf('Rate')>-1) {
+                        payRates += (c>0 ? ',' : '');
+                        payRates += cd.name + ':' + cd.value;
+                    }
+                }
+                
+                entity.payRates = payRates;
+                
+                entity.entityDivId = entityType.replace(/ /g,'_') + '_' + entity.name.replace(/ /g,'_');
+                entity.entTimerId = 'TC_StateDuration_' + entity.name.replace(/ /g,'_');
+                entity.clockState = entity.punchState.replace(/Punched/g,'Clocked');
+                entity.taskStart = '';
+                entity.taskStartUTC = '';
+                entity.taskDatetimeISO = '';
+                entity.taskId = '';
+                entity.taskIdent = '';
+                for (var t=0; t<tasks.length; t++) {
+                    var task = tasks[t];
+                    //spu.consoleLog('>>>>>>>>>>>>>>>>>>>>>>>>>>'+task.id+ ' '+task.identifier+' '+task.startDate);
+                    if (task.name == entity.name) {
+                        // if (task.state == entity.punchState) {
+                        entity.taskId = task.id;
+                        entity.taskIdent =  task.identifier;
+
+                        var timeStart = task.startDate.toString();
+                        var timeStartUTC = Date.parse(timeStart).toString();
+                            timeStartUTC = (timeStartUTC.length>10 ? timeStartUTC.substr(0,10) : timeStartUTC);
+
+                        var startDT = task.startDate.toString(); // 2016-07-30T13:37:44.587Z
+                        var startMS = startDT.substr(20,4).replace(/Z/g,'');
+                            startMS = (startMS<100 ? (startMS<10 ? '00'+startMS : '0'+startMS) : startMS);
+                            startDT = startDT.substr(0,19) + '.' + startMS + GMToffset;
+                            
+                        entity.taskStart = timeStart;//startDT; // 2016-07-30T13:37:44.587
+                        
+                        var dtISO = startDT;// + GMToffset;   // 2016-07-30T13:37:44.587-06:00
+                        entity.taskDatetimeISO = timeStart;//dtISO;
+                        var tsUTC = Date.parse(dtISO).toString();                   // 1469907464587
+                            tsUTC = (tsUTC.length>10 ? tsUTC.substr(0,10) : tsUTC); // 1469907464
+                        entity.taskStartUTC = timeStartUTC;//tsUTC;
+                        //}
+                    }
+                }
+                
+                if (entity.taskIdent == '') {
+                    entity.punchState = 'Punched Out';
+                    entity.punchStateClass = 'TC_Punched_Out';
+                    entity.clockState = entity.punchState.replace(/Punched/g,'Clocked');
+                    spu.consoleLog('NO PUNCH DATA FOUND.  Setting initial Entity Punch State: ' + entity.punchState);
+                    TC_updateEntityState('Employees',entity.name,'TC Punch Status','Punched Out');
+                }
+
+                
+                estuff += '<div id="' + entity.entityDivId + '"';
+                estuff += ' class="TC_Entity"';
+                estuff += ' entityType="' + entityType + '"';
+                estuff += ' entityId="' + entity.id + '"';
+                estuff += ' entityName="' + entity.name+ '"';
+                estuff += ' payRates="' + entity.payRates + '"';
+                estuff += ' punchState="' + entity.punchState + '"';
+                estuff += ' taskId="'+entity.taskId+'"';
+                estuff += ' taskIdent="'+entity.taskIdent+'"';
+                estuff += ' taskStart="'+entity.taskStart+'"';
+                estuff += ' taskStartUTC="'+entity.taskStartUTC+'"';
+                estuff += ' taskDatetimeISO="'+entity.taskDatetimeISO+'"';
+                estuff += ' isSelected="0"';
+                estuff += '>';
+                estuff += '<div class="TC_EntityName">';
+                estuff += entity.name;
+                estuff += '</div>';
+                estuff += '<div class="' + entity.punchStateClass + '">';
+                estuff += entity.clockState;
+                estuff += '</div>';
+                
+                //if (entity.punchState == 'Punched In') {
+                    estuff += '<div id="' + entity.entTimerId + '" class="TC_StateDuration" timeStartUTC="'+entity.taskStartUTC+'" timeStart="'+entity.taskStart+'">00:00:00</div>';
+                //}
+                estuff += '</div>';
+
+                
+
+                TC_Entities.push(entity);
+
+            }
+            
+            estuff += '<div style="height:50px;"> </div>';
+            
+            $('#TC_Entities').html(estuff);
+            
+        }
+        if (callback) {
+            callback(TC_Entities);
+        }
+    });
+
+//    return TC_Entities;
+}
+
+function TC_updateTimerDisplay(timerId, startTime) {
+    if (document.getElementById(timerId)) {
+        var t = document.getElementById(timerId);
+        var tstart = t.getAttribute('timeStart');
+        var tstartUTC = t.getAttribute('timeStartUTC');
+            
+        var tnUTC = moment().format('YYYY-MM-DDTHH:mm:ss.SSSZ');
+            tnUTC = Date.parse(tnUTC).toString();                   // 1469907464587
+            tnUTC = (tnUTC.length>10 ? tnUTC.substr(0,10) : tnUTC); // 1469907464
+            tnUTC = Number(tnUTC);
+        
+        var tdiff = 0;//datediff(tstart,tnow,'s');
+            tdiff = tnUTC - tstartUTC;
+        
+        var h = tdiff/60/60;
+            h = (h<1 ? 0 : h);
+            h = parseInt(h);
+        var m = ( tdiff - (h*60*60) ) / 60;
+            m = (m<1 ? 0 : m);
+            m = parseInt(m);
+        var s = tdiff - (h*60*60) - (m*60);
+            s = parseInt(s);
+        
+        t.innerHTML = (h<10 ? '0'+h : h)+':'+(m<10 ? '0'+m : m)+':'+(s<10 ? '0'+s : s);
+    }
+}
+function TC_entityTimer(timerId, startTime, op, rate) {
+    if (op=='start') {
+        var intervalId = setInterval(function() {
+            TC_updateTimerDisplay(timerId, startTime);
+        }, rate);
+        spu.consoleLog('Started Entity Timer ('+timerId+') with refresh rate: '+rate+' ms.');
+        return intervalId;
+    } else {
+        clearTimers('TC_entityTimer');
+    }
+}
+
+function TC_updateEmployeeTimers(employees, tasks, callback) {
+    spu.consoleLog('Updating Timeclock Timers ('+employees.length+')');
+    spu.consoleLog('Timeclock Entities: '+employees.length);
+    spu.consoleLog('Timeclock Tasks: '+tasks.length);
+    
+    TC_entityTimer('','', 'stop');
+    
+    var GMToffset = getClientGMToffset();
+    
+    var employees = TC_Entities;
+    var tasks = TC_Tasks;
+    
+    for (var e=0; e<employees.length; e++) {
+        var entity = employees[e];
+
+        spu.consoleLog('Iterating Timeclock Tasks ('+tasks.length+') looking for: '+entity.name);
+
+        for (var t=0; t<tasks.length; t++) {
+
+            var task = tasks[t];
+
+            var timeStart = task.startDate.toString();
+            var timeStartUTC = Date.parse(timeStart).toString();
+                timeStartUTC = (timeStartUTC.length>10 ? timeStartUTC.substr(0,10) : timeStartUTC);
+
+            var customData = task.customData;
+
+            var taskEntityName = '';
+            var taskId = 0;
+            var taskIdent = '';
+
+            for (var d=0; d<customData.length; d++) {
+                //spu.consoleLog(entity.name + '... CD ['+customData[d].name+']'+customData[d].value);
+                if (customData[d].name == 'entityName') {
+                    taskEntityName = customData[d].value;
+                }
+            }
+
+            if (taskEntityName == entity.name) {
+
+                taskId = task.id;
+                taskIdent = task.identifier;
+                
+                timeStart = task.startDate.toString();
+                timeStartUTC = Date.parse(timeStart).toString();                   // 1469907464587
+                timeStartUTC = (timeStartUTC.length>10 ? timeStartUTC.substr(0,10) : timeStartUTC); // 1469907464
+
+                spu.consoleLog('Found Timeclock Task for ('+taskEntityName+'): '+taskIdent+' (ID:'+taskId+')');
+
+                spu.consoleLog(taskEntityName+' Punch Status: '+entity.punchState);
+
+                if (document.getElementById(entity.entTimerId)) {
+                    document.getElementById(entity.entTimerId).setAttribute('timeStart',timeStart);
+                    document.getElementById(entity.entTimerId).setAttribute('timeStartUTC',timeStartUTC);
+                }
+                if (entity.punchState == 'Punched In') {
+                    spu.consoleLog('Starting Entity Timer for: '+taskEntityName);
+                    TC_entityTimer(entity.entTimerId, timeStart, 'start', 1000);
+                } else {
+                    spu.consoleLog('No need to start Entity Timer for: '+taskEntityName);
+                }
+                break;
+            }
+            
+        }
+        
+    }
+    
+    if (callback) {
+        callback(employees, tasks);
+    }
+}
+
+function TC_refreshTimeclockDisplay(entityType,search,callback) {
+    spu.consoleLog("Refreshing Timeclock Display ...");
+    $('#TC_Entities').html('<div class="info-message">Fetching Entities, please Wait...<br /><br />'+busyWheel+'</div>');
+    TC_getTimeclockTasks(TC_PunchTaskType,'false','','','',''
+        , function tcTasks() {
+            TC_refreshEmployeeEntities(entityType, search, '', TC_Tasks
+            , function empTimers() {
+                TC_updateEmployeeTimers(TC_Entities,TC_Tasks
+                , function et(){
+                    $('#REP_Report').empty();
+                    if (callback) {
+                        callback();
+                    }
+                });
+            });
+        }
+    );
+}
+
+
+function TC_getTimeclockTasks(taskType,completedFilter,nameLike,contentLike,fieldFilter, state, callback) {
+    var fn = spu.fi(arguments);
+    var timeOffset = getClientGMToffset().split(':');
+    var offsetHours = Number(timeOffset[0]);
+        offsetHours = offsetHours + Number(timeOffset[1])/60;
+
+    gql.EXEC(gql.getTasks(taskType,completedFilter,nameLike,contentLike,fieldFilter, state), function(response) {
+        if (response.errors) {
+            gql.handleError(fn+" gql.getTasks", response);
+            callback('ERROR');
+        } else {
+            TC_Tasks = [];
+            var tasks = response.data.tasks;
+            spu.consoleLog('Got Timeclock Tasks: '+tasks.length);
+            for (var t=0; t<tasks.length; t++) {
+                
+                // GQL getTasks returns start/end dates with the client TZ-offset already applied, 
+                // not the actual dates as found in the DB, so we need to backout the offset
+                var beg = tasks[t].startDate.replace(/Z/g,'');
+                var end = tasks[t].endDate.replace(/Z/g,'');
+
+                beg = moment(beg, dateFormats).add(offsetHours,'hours').format('YYYY-MM-DDTHH:mm:ss.SSSZ');
+                end = moment(end, dateFormats).add(offsetHours,'hours').format('YYYY-MM-DDTHH:mm:ss.SSSZ');
+                
+                tasks[t].startDate = beg;
+                tasks[t].endDate =  end;
+        
+            }
+            TC_Tasks = tasks;
+        }
+        if (callback) {
+            callback(TC_Tasks);
+        }
+    });
+    return TC_Tasks;
+}
+
+function TC_updateEntityState(entityType,entityName,stateName,state,callback) {
+    var fn = spu.fi(arguments);
+    gql.EXEC(gql.updateEntityState(entityType,entityName,stateName,state), function(response) {
+        if (response.errors) {
+            gql.handleError(fn+" gql.updateEntityState", response);
+        } else {
+            var ent = response.data.updateEntityState;
+        }
+        if (callback){
+            callback(ent);
+        }
+    });
 }

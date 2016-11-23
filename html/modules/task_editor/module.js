@@ -3,12 +3,15 @@
 // nav_task_editor
 //
 ////////////////////////////////
-function init_nav() {
-    // do some stuff
-}
-spu.consoleLog('Initializing '+module.replace(/_/,' ').toUpperCase()+' ...');
+spu.consoleLog('Loading Module JS for: '+module.replace(/_/,' ').toUpperCase()+' ...');
 
-//updateTaskMessage('Loading...');
+function init_module() {
+    spu.consoleLog('Initializing Module JS for: '+module.replace(/_/,' ').toUpperCase()+' ...');
+    
+    loadTaskTypeList(function tedisp(){
+        refreshTaskEditorDisplay(TSK_TaskTypes[0],'false');
+    });
+}
 
 $('#TSK_Tasks').on('click', '.TSK_Task', function(){
     var btn = this.id; // Employees_Jenery, Employees_Ovania, ...

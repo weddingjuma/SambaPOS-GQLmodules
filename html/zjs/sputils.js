@@ -25,7 +25,16 @@ spu.consoleLog = function (msg, vals) {
     var when = '['+formatDateTime(new Date(),true)+'] ';
     console.log(when+msg);
 };
-
+spu.fi = function(args) {
+    var arglist = '';
+    for (var a=0; a<args.length; a++) {
+        arglist += (a==0 ? '' : ',');
+        arglist += (typeof args[a]=='string' ? "'"+args[a]+"'" : (typeof args[a]!=='undefined' ? args[a].toString().substr(0,20).replace(/\r\n/g,'') : 'error reading function'));
+    }
+    var retval = '___FUNC___: ' + args.callee.name + '('+arglist+') from ' + (args.callee.caller.name=='' ? '[anonFunc]' : args.callee.caller.name);
+    spu.consoleLog(retval);
+    return retval;
+};
 spu.debounce = function (func, wait, immediate) {
 // Returns a function, that, as long as it continues to be invoked, will not
 // be triggered. The function will be called after it stops being called for
@@ -102,7 +111,7 @@ spu.refreshMoments = function () {
     yy = date.getYear();
     year = (yy < 1000) ? yy + 1900 : yy;
     
-    spu.consoleLog('Refreshed Moments.');
+    spu.consoleLog('TIMERS> Refreshed Moments.');
 };
 
 spu.hideHeader = function () {
@@ -136,124 +145,152 @@ spu.getBusinessSettings = function () {
     getGlobalSetting('BUS_BusinessName', function(ret) {
         var setting = ret;
         if (!setting.error && setting.value !=='') {
-            businessName = setting.value;
+            CD_businessName = setting.value;
         }
     });
     getGlobalSetting('BUS_VenueName', function(ret) {
         var setting = ret;
         if (!setting.error && setting.value !=='') {
-            venueName = setting.value;
+            CD_venueName = setting.value;
         }
     });
     getGlobalSetting('BUS_MSG_Welcome', function(ret) {
         var setting = ret;
         if (!setting.error && setting.value !=='') {
-            welcomeMessage = setting.value;
+            CD_welcomeMessage = setting.value;
         }
     });
     getGlobalSetting('BUS_MSG_Open', function(ret) {
         var setting = ret;
         if (!setting.error && setting.value !=='') {
-            openMessage = setting.value;
+            CD_openMessage = setting.value;
         }
     });
     getGlobalSetting('BUS_MSG_Closed', function(ret) {
         var setting = ret;
         if (!setting.error && setting.value !=='') {
-            closedMessage = setting.value;
+            CD_closedMessage = setting.value;
         }
     });
 };
 
 spu.executeAutomationCommand = function(name,value) {
+//    alert('execcmd3:'+name+'/'+value);
     window.external.ExecuteAutomationCommand(name,value);
 };
 
-spu.getUsers = function (callback) {
-    spu.consoleLog('Getting Users...');
-    users = [];
-    getReportVars('GQLM Users',function u(data){
-        users = data;
-        if (callback) {
-            callback(users);
-        }
-    });
-};
 
 spu.validateUser = function (user, pin, callback) {
-    spu.consoleLog('Validating User ...');
+    spu.consoleLog('USER Validating ...');
     
-    if (bypassAllAuth) {
-        spu.consoleLog('ALL USER AUTHENTICATION IS BYPASSED.');
-        currentUser = defaultUser;
-        $('#USER_Auth').hide();
-        if (callback) {
-            callback();
-        }
-        return;
-    }
-    
-    var bypassMatch = false;
-    
-    if (allowAuthBypass && !bypassAllAuth) {
+    //$('#numpad').append('<div class="info-message">Validating, please Wait...<br /><br />'+busyWheel+'</div>');
+    getReportVars('GQLM Users','', function u(data){
+
+        users = data;
+            
+        var userValidated = false;
+        var bypassIPmatch = false;
+        var bypasspasshash = false;
+//        var userLogout = false;
         
-        getClientIP(function(data) {
-            
-            clientIP = data;
-            spu.consoleLog('CLIENT IP:' +clientIP);
-            
-            for (var i=0; i<bypassIPs.length; i++) {
-                if (clientIP == bypassIPs[i]) {
-                    bypassMatch = (allowAuthBypass ? true : false);
+        if (bypassAllAuth) {
+            spu.consoleLog('USER ALL AUTHENTICATION IS BYPASSED!');
+            $('#USER_Auth').hide();
+            currentUser = currentUser=='' || currentUser=='undefined' || typeof currentUser==='undefined' ? defaultUser : currentUser;
+            for (var u=0; u<users.length; u++) {
+                if (currentUser == users[u].name) {
+                    bypasspasshash = users[u].PIN.toUpperCase();
                     break;
                 }
             }
+        }
+        
+        getClientIP(true, function ipg(data) {
 
-            if (!bypassMatch) {
+            clientIP = data;
+            spu.consoleLog('USER CLIENT IP: ' +clientIP);
+
+            for (var i=0; i<bypassIPs.length; i++) {
+                if (clientIP == bypassIPs[i]) {
+                    bypassIPmatch = (allowAuthBypass ? true : false);
+                    spu.consoleLog('USER Validation Bypass for: ' + bypassIPs[i]);
+                    $('#USER_Auth').hide();
+                    break;
+                }
+            }
                 
-                //$('#numpad').append('<div class="info-message">Validating, please Wait...<br /><br />'+busyWheel+'</div>');
-
-                spu.getUsers(function u(data){
-                    users = data;
-
-                    if (!currentUserData.validated || !currentUserData.name || !currentUserData.PIN || currentUserData.PIN == '') {
-//                        spu.consoleLog('Prompting User for PIN ...');
-//                        var pin = prompt("Enter PIN:",'');
-                        
-                        var pincookie = clientSetting('phash','','get');
-                        var pin = document.getElementById('USER_inPIN').value;
-                        var pinhash  = (pincookie!='' ? pincookie : CryptoJS.SHA512(pin).toString().toUpperCase());
-                        document.getElementById('USER_inPIN').value = '';
-
-                        for (var u=0; u<users.length; u++) {
-                            var passhash = users[u].PIN.toUpperCase();
-                            //spu.consoleLog('Checking against Hash: '+passhash);
-                            if (pinhash == passhash) {
-                                currentUserData = users[u];
-                                currentUserData.validated = true;
-                                currentUser = currentUserData.name;
-                                $('#currentUser').html('['+currentTerminal+'] '+currentUser);
-                                spu.consoleLog('User Validated: '+currentUserData.name);
-                                clientSetting('userName',currentUserData.name,'set');
-                                clientSetting('phash',pinhash,'set');
-                                $('#USER_Auth').hide();
-                                break;
-                            }
-                        }
+            if (bypassIPmatch && allowAuthBypass && !bypassAllAuth) {
+                currentUser = currentUser=='' || currentUser=='undefined' || typeof currentUser==='undefined' ? defaultUser : currentUser;
+                for (var u=0; u<users.length; u++) {
+                    if (currentUser == users[u].name) {
+                        bypasspasshash = users[u].PIN.toUpperCase();
+                        break
                     }
+                }
+            }
+            
+            if (!currentUserData.validated || !currentUserData.name || !currentUserData.PIN || currentUserData.PIN == '') {
+                
+//                userLogout = true;
+//                        spu.consoleLog('USER Prompting for PIN ...');
+//                        var pin = prompt("Enter PIN:",'');
 
-                    if (!currentUserData.validated) {
-                        spu.consoleLog('User Validation FAILED!');
-                        logoutUser();
+                var pincookie = clientSetting('phash','','get');
+                
+                var pin = document.getElementById('USER_inPIN').value;
+                document.getElementById('USER_inPIN').value = '';
+                var inPINhash = pin=='' ? false : CryptoJS.SHA512(pin).toString().toUpperCase();
+                var pinhash  = (pincookie!='' ? pincookie : inPINhash);
+
+                if (bypasspasshash) {
+                    pinhash = bypasspasshash;
+                }
+                
+                if (userLogout) {
+                    pinhash = inPINhash;
+                }
+                
+                for (var u=0; u<users.length; u++) {
+                    var passhash = users[u].PIN.toUpperCase();
+                    //spu.consoleLog('USER Checking against Hash: '+passhash);
+                    if (pinhash == passhash) {
+                        userValidated = true;
+                        currentUserData = users[u];
+                        $('#USER_Auth').hide();
+                        break;
+                    }
+                }
+                
+                if (userValidated) {
+                    currentUserData.validated = true;
+                    currentUser = currentUserData.name;
+                    currentUserRole = currentUserData.role;
+                    $('#currentUser').html('['+POS_Terminal.name+'] '+currentUser);
+                    $('#currentUser').attr('title',currentTerminal+' ['+POS_Terminal.id+'] ('+currentUserRole+')');
+                    spu.consoleLog('USER Validated: '+currentUserData.name);
+                    clientSetting('userName',currentUserData.name,'set');
+                    clientSetting('userRole',currentUserData.role,'set');
+                    clientSetting('phash',pinhash,'set');
+                    if (userLogout) {
+                        // registerTerminal(terminal,department,ticketType,user,reRegister)
+                        registerTerminal(POS_Terminal.name,departmentName,ticketTypeName,currentUser,true, function rereg(data) {
+                            var term = data;
+                            if (term.registered) {
+                                spu.consoleLog('TERMINAL Re-registered ['+term.name+'] with Validated User ['+currentUser+']: '+term.id);
+                                userLogout = false;
+                                if (callback) {
+                                    callback(currentUserData);
+                                }
+                            }
+                        });
                     }
                     
-                    if (callback) {
-                        callback(currentUserData);
-                    }
-                });
-
+                } else {
+                    spu.consoleLog('USER Validation FAILED: '+currentUser);
+                }
+                
             } else {
-                spu.consoleLog('User Validation Bypass for: ' + bypassIPs[i]);
+                spu.consoleLog('USER Validated from Cache: '+currentUserData.name);
                 $('#USER_Auth').hide();
             }
 
@@ -263,14 +300,17 @@ spu.validateUser = function (user, pin, callback) {
 
         });
 
-    }
-    
+    });
 };
 
-function logoutUser (validate) {
-    spu.consoleLog('Logging out user...');
+function logoutUser (validate, callback) {
+    validate = typeof validate ==='undefined' ? false : validate;
+    spu.consoleLog('USER Logging out (validate='+validate+') ...');
+    
+    userLogout = true;
     
     clientSetting('userName','','del');
+    clientSetting('userRole','','del');
     clientSetting('phash','','del');
     
     $('#USER_Auth').show();
@@ -279,16 +319,21 @@ function logoutUser (validate) {
     
     currentUserData = {};
     currentUserData.name = 'unknownUser';
+    currentUserData.role = '';
     currentUserData.PIN = '';
     currentUserData.validated = false;
     
     currentUser = defaultUser;
-    $('#currentUser').html('['+currentTerminal+'] '+currentUser);
-
+    $('#currentUser').html('['+POS_Terminal.name+'] '+currentUser);
+    $('#currentUser').attr('title',currentTerminal+' ['+POS_Terminal.id+'] ('+currentUserRole+')');
+    
     if (validate) {
         spu.validateUser();
     }
     
+    if (callback) {
+        callback();
+    }
 //    spu.getUsers(function u(data){
 //        users = data;
 
@@ -305,6 +350,7 @@ function session_id_old() {
     return /SESS\w*ID=([^;]+)/i.test(document.cookie) ? RegExp.$1 : false;
 }
 function session_id(){
+    var fn = spu.fi(arguments);
     return clientSetting('SESSIONID',randomString(32,'aA#'),'get');
 }
 function randomString(length, chars) {
@@ -325,60 +371,71 @@ function updatePageTitle(modscreen) {
     $(document).prop('title',newTitle);
 }
 
-function getReportVars(reportName,callback) {
+function getReportVars(reportName,reportParameters, callback) {
+    var fn = spu.fi(arguments);
+    var parmList = typeof reportParameters==='undefined' || reportParameters==='' ? '' : reportParameters;
+    var parms = '';
+    for (var p=0; p<parmList.length; p++) {
+        parms += '{name:"'+(p+1)+'",value:"'+parmList[p]+'"}';
+        parms += (p===parmList.length-1 ? '' : ',');
+    }
     spu.consoleLog('Getting ReportVars ['+reportName+']...');
     
-    var dataArray = [];
-    
+    var user = typeof currentUser==='undefined' || currentUser=='undefined' || currentUser=='' ? defaultUser : currentUser;
     //                           reportName,user,dateFilter,startDate,endDate,parameters
-    gql.EXEC(gql.getCustomReport(reportName,currentUser), function rep(report){
-        
-        var report = report.data.report;
-        var table = report.tables[0];
-        var columns = table.columns;
-        
-        var rows = table.rows;
-        var rowCount = rows.length;
-        
-        for (var r=0; r<rowCount; r++) {
-            var row = rows[r];
-            var cells = row.cells;
-            var cellCount = cells.length;
-            var dataRow = {};
-            for (var c=0; c<cellCount; c++) {
-                var dataName = columns[c].header;
-                var dataValue = cells[c];
-                
-                switch (dataName) {
-                    case 'template':
-                        var template = hex2string(dataValue);
-                        template = template.replace(/\r\n/g,'LINEBREAK');
-                        template = template.replace(/"/g,'\"');
-                        // get columnCount and ColWidths
-                        var headBeg = template.indexOf('[');
-                        var headEnd = template.indexOf(']');
-                        var head = template.substring(headBeg,headEnd+1);
-                        var colStart = head.indexOf(':');
-                        var cols = head.substr(colStart+1,(head.length-colStart-2));
-                        var hasParms = (template.indexOf('$') > -1 ? '1' : '0');
-                        dataRow.hasParms = hasParms;
-                        dataRow.head = head;
-                        dataRow.cols = cols;
-                        dataRow.template = template;
-                        break;
-                    default:
-                        dataRow[dataName] = dataValue;
-                        break;
+    gql.EXEC(gql.getCustomReport(reportName,user,'','','',parms), function rep(response){
+        if (response.errors) {
+            gql.handleError(fn+" gql.getCustomReport", response);
+        } else {
+            var report = response.data.report;
+            var table = report.tables[0];
+            var columns = table.columns;
+
+            var rows = table.rows;
+            var rowCount = rows.length;
+            
+            var dataArray = [];
+
+            for (var r=0; r<rowCount; r++) {
+                var row = rows[r];
+                var cells = row.cells;
+                var cellCount = cells.length;
+                var dataRow = {};
+                for (var c=0; c<cellCount; c++) {
+                    var dataName = columns[c].header;
+                    var dataValue = cells[c];
+
+                    switch (dataName) {
+                        case 'template':
+                            var template = hex2string(dataValue);
+                            template = template.replace(/\r\n/g,'LINEBREAK');
+                            template = template.replace(/"/g,'\"');
+                            // get columnCount and ColWidths
+                            var headBeg = template.indexOf('[');
+                            var headEnd = template.indexOf(']');
+                            var head = template.substring(headBeg,headEnd+1);
+                            var colStart = head.indexOf(':');
+                            var cols = head.substr(colStart+1,(head.length-colStart-2));
+                            var hasParms = (template.indexOf('$') > -1 ? '1' : '0');
+                            dataRow.hasParms = hasParms;
+                            dataRow.head = head;
+                            dataRow.cols = cols;
+                            dataRow.template = template;
+                            break;
+                        default:
+                            dataRow[dataName] = dataValue;
+                            break;
+                    }
                 }
+
+                dataArray.push(dataRow);
             }
 
-            dataArray.push(dataRow);
-        }
-        
-        spu.consoleLog('Got ReportVars ['+reportName+']: ' + dataArray.length);
-        
-        if (callback) {
-            callback(dataArray);
+            spu.consoleLog('Got ReportVars ['+reportName+']: ' + dataArray.length);
+
+            if (callback) {
+                callback(dataArray);
+            }
         }
     });
     
@@ -456,28 +513,75 @@ function showInfoMessage(content) {
     }
 }
 function showHelpMessage(content) {
-    content += '<div class="closeButton" title="click to close" onclick="$(\'#helpMessage\').hide();">X</div>';
+    content += '<div class="closeButton" title="click to close" onclick="$(\'#helpMessage\').hide();return false;">X</div>';
     $('#helpMessage').html(content);
     $('#helpMessage').show();
+}
+function showWarningMessage(content) {
+    content += '<div class="closeButton" title="click to close" onclick="$(\'#warningMessage\').hide();return false;">X</div>';
+    $('#warningMessage').html(content);
+    $('#warningMessage').show();
 }
 function showErrorMessage(content) {
     content = content.replace(/\\r\\n/g,'<br />');
     content = content.replace(/\\r/g,'<br />');
     content = content.replace(/\\n/g,'<br />');
-    content += '<div class="closeButton" title="click to close" onclick="$(\'#errorMessage\').hide();">X</div>';
+    content += '<div class="closeButton" title="click to close" onclick="$(\'#errorMessage\').hide();return false;">X</div>';
     $('#errorMessage').html(content);
     $('#errorMessage').show();
 }
+function showTerminalInfo() {
+    var fn = spu.fi(arguments);
+    $('#TERM_Info').html('<div class="info-message">Fetching Terminals, please Wait...<br /><br />'+busyWheel+'</div>');
+    $('#TERM_Info').show();
+    getReportVars('GQLM Terminals','', function tm(data){
+        terminals = data;
+        
+        var content = '';
+            content += '<div style="text-align:left;">';
+
+            content += '<div>';
+            content += '<div class="TERM_InfoCell_Label">Current User:</div>';
+            content += '<div class="TERM_InfoCell_Data">' + currentUser + '</div>';
+            content += '<div class="TERM_InfoCell_Command" onClick="$(\'#TERM_Info\').hide();logoutUser();return false;">Logout</div>';
+            content += '<div class="TERM_InfoCell_Label">User Role:</div>';
+            content += '<div class="TERM_InfoCell_Data">' + currentUserRole + '</div>';
+            content += '<div class="TERM_InfoCell_Label">Browser/Agent:</div>';
+            content += '<div class="TERM_InfoCell_Data">' + currentTerminal;
+//            content += '<div class="TERM_InfoCell_Command" style="text-align:left;font-size:22px;">(Browser/Agent)</div>';
+            content += '</div>';
+
+            content += '<div><br />';
+            content += '<div class="TERM_InfoCell_Label"><u>Terminals</u></div>';
+            content += '<div class="TERM_InfoCell_Data" style="color:#999999;font-size:22px;">(click a Name to register)</div>';
+            content += '</div>';
+        for (var t=0; t<terminals.length; t++) {
+            var term = terminals[t];
+            content += '<div>';
+    //        content += '<div style="display:inline-block;">' + term.dbId + '</div>:';
+            content += '<div class="TERM_TerminalName" onclick="registerTerminal('+"'"+term.name+"','','','',false,showTerminalInfo"+');">' + term.name + '</div>';
+            content += '<div class="TERM_InfoCell_Data">' + (POS_Terminal.registered && term.name == POS_Terminal.name ? '['+POS_Terminal.user+']['+POS_Terminal.id.substr(0,5)+'...]' : '' )+ '</div>';
+            content += '<div class="TERM_InfoCell_Command">' + (POS_Terminal.registered && term.name == POS_Terminal.name ? '<span onClick="unregisterTerminal(\''+POS_Terminal.id+'\',showTerminalInfo);">Unregister</span>' : '') + '</div>';
+            content += '</div>';
+        }
+
+        content += '</div>';
+
+        content += '<div class="closeButton" title="click to close" onclick="$(\'#TERM_Info\').hide();return false;">X</div>';
+        $('#TERM_Info').html(content);
+        //$('#TERM_Info').show();
+    });
+}
 
 function clearTimers(fromWhere) {
-    spu.consoleLog('Clearing Timers from ['+fromWhere+']');
+    spu.consoleLog('TIMERS> Clearing Timers from ['+fromWhere+']');
     
     // Set a fake timeout to get the highest timeout id
     var highestIntervalId = setInterval(";");
     for (var i = 0 ; i <= highestIntervalId ; i++) {
         clearInterval(i); 
     }
-    spu.consoleLog('Cleared all timers.  Restarting Clock...');
+    spu.consoleLog('TIMERS> Cleared all timers.  Restarting Clock...');
     clockTimer = setInterval(showTime, 500);
     getBatteryLevel();
     batteryTimer = setInterval(getBatteryLevel, 300000); // poll battery level every 5 minutes
@@ -827,63 +931,72 @@ function enterdigit(but,el) {
     }
 }
 
-function getClientIP(callback) {
-    spu.consoleLog('Getting Client IP ...');
+function getClientIP(fetchIP, callback) {
+    fetchIP = typeof fetchIP === 'undefined' || fetchIP==='' ? true : fetchIP;
+    spu.consoleLog('Getting Client IP (fetchIP='+fetchIP+') ...');
     
-    if (PHP) {
-        
-        spu.consoleLog('getClientIP Method: Server Call (local)');
-        
-        $.get(webUrl+"/zjs/lib/ipinfo.php", function(data){
-            spu.consoleLog('UTIL:'+data);
-            var d = JSON.parse(data);
-            spu.consoleLog('UTILra:'+d.ra);
-            spu.consoleLog('UTIL4:'+d.v4);
-            spu.consoleLog('UTIL6:'+d.v6);
-            if (callback) {
-                callback(d.v4);
-            }
-        });
+    if (fetchIP) {
 
-    } else {
-        
-        if (isiDevice || navigator.sayswho.indexOf('IE ') > -1) {
+        if (PHP) {
 
-            spu.consoleLog('getClientIP Method: Server Call (remote)');
+            spu.consoleLog('getClientIP Method: Server Call (local)');
 
-            $.getJSON('//freegeoip.net/json/?callback=?', function(data) {
-                clientIP = data.ip;
-                //spu.consoleLog('CLIENT IP:' +clientIP);
+            $.get(webUrl+"/zjs/lib/ipinfo.php", function(data){
+                spu.consoleLog('UTIL:'+data);
+                var d = JSON.parse(data);
+                spu.consoleLog('UTILra:'+d.ra);
+                spu.consoleLog('UTIL4:'+d.v4);
+                spu.consoleLog('UTIL6:'+d.v6);
                 if (callback) {
-                    callback(data.ip);
+                    callback(d.v4);
                 }
-                return data.ip;
             });
 
         } else {
 
-            spu.consoleLog('getClientIP Method: WebRTC');
+            if (isiDevice || navigator.sayswho.indexOf('IE ') > -1) {
 
-            window.RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;   //compatibility for firefox and chrome
-            var pc = new RTCPeerConnection({iceServers:[]}), noop = function(){};      
-            pc.createDataChannel("");    //create a bogus data channel
-            pc.createOffer(pc.setLocalDescription.bind(pc), noop);    // create offer and set local description
-            pc.onicecandidate = function(ice){  //listen for candidate events
-                if(!ice || !ice.candidate || !ice.candidate.candidate)  return;
-                var myIP = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/.exec(ice.candidate.candidate)[1];
-                //console.log('my IP: ', myIP);
-                pc.onicecandidate = noop;
+                spu.consoleLog('getClientIP Method: Server Call (remote)');
 
-                clientIP = myIP;
+                $.getJSON('//freegeoip.net/json/?callback=?', function(data) {
+                    clientIP = data.ip;
+                    //spu.consoleLog('CLIENT IP:' +clientIP);
+                    if (callback) {
+                        callback(data.ip);
+                    }
+                    return data.ip;
+                });
 
-                if (callback) {
-                    callback(myIP);
-                }
+            } else {
 
-                return myIP;
-            };
+                spu.consoleLog('getClientIP Method: WebRTC');
+
+                window.RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;   //compatibility for firefox and chrome
+                var pc = new RTCPeerConnection({iceServers:[]}), noop = function(){};      
+                pc.createDataChannel("");    //create a bogus data channel
+                pc.createOffer(pc.setLocalDescription.bind(pc), noop);    // create offer and set local description
+                pc.onicecandidate = function(ice){  //listen for candidate events
+                    if(!ice || !ice.candidate || !ice.candidate.candidate)  return;
+                    var myIP = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/.exec(ice.candidate.candidate)[1];
+                    //console.log('my IP: ', myIP);
+                    pc.onicecandidate = noop;
+
+                    clientIP = myIP;
+
+                    if (callback) {
+                        callback(myIP);
+                    }
+
+                    return myIP;
+                };
+            }
+
         }
-    
+    } else {
+        spu.consoleLog('Get Client IP BYPASSED: (fetchIP='+fetchIP+')');
+        if (callback) {
+            callback(false);
+        }
     }
 }
 
@@ -925,7 +1038,7 @@ function clientSetting(sName,sValue,sOp,sType) {
             op = 'get';
     }
     sType = (typeof sType==='undefined' ? '' : sType).toLowerCase();
-    var type = ''
+    var type = '';
     switch(sType) {
         case 'session':
             type = sType;
@@ -995,4 +1108,288 @@ function clientSetting(sName,sValue,sOp,sType) {
         
         return valstore;
     } 
+}
+
+function cloneData(data) {
+    // Use the JSON parse to clone the data.
+    // Convert the data into a string first
+    var jsonString = JSON.stringify(data);
+
+    //  Parse the string to create a new instance of the data
+    return JSON.parse(jsonString);
+}
+
+// shim for iPad scrollbars for Task Editor
+function jumpTop() {
+    if (navigator.userAgent.match(/(iPod|iPhone|iPad|Android)/)) {           
+        window.scrollTo(200,100); // first value for left offset, second value for top offset
+        window.setTimeout(function() {window.scrollTo(0,0);}, 300);
+        window.scrollTo(0, 0);
+        window.scroll(0, 1);
+    } else {
+        $('html,body').animate({
+            scrollTop: 0,
+            scrollLeft: 0
+        }, 300, function(){
+            $('html,body').clearQueue();
+        });
+    }
+}
+// shim for iPad scrollbars for Task Editor
+function jumpBottom(inDiv) {
+    var inDiv = inDiv ? inDiv : 'html,body';
+    if (navigator.userAgent.match(/(iPod|iPhone|iPad|Android)/)) {           
+        window.scrollTo(200,100); // first value for left offset, second value for top offset
+        window.setTimeout(function() {window.scrollTo(0,3000);}, 300);
+        window.scrollTo(0, 3000);
+        window.scroll(0, 3000);
+    } else {
+        $(inDiv).animate({
+            scrollTop: 3000,
+            scrollLeft: 0
+        }, 300, function(){
+            $(inDiv).clearQueue();
+        });
+    }
+}
+
+
+
+function broadcastMessage(msg) {
+    var fn = spu.fi(arguments);
+    spu.consoleLog('Broadcasting Message:'+msg);
+    gql.EXEC(gql.postBroadcastMessage(msg), function(response) {
+        if (response.errors) {
+            gql.handleError(fn+" gql.postBroadcastMessage", response);
+        } else {
+            spu.consoleLog('Message Broadcasted:'+response.data.postBroadcastMessage.message);
+        }
+    });
+}
+
+
+function getLocalSetting(settingName, callback) {
+    var fn = spu.fi(arguments);
+    gql.EXEC(gql.getLocalSetting(settingName), function(response) {
+        var sName='';
+        var sValu='';
+        if (response.errors) {
+            gql.handleError(fn+" gql.getLocalSetting", response);
+            callback('ERROR');
+        } else {
+            sName = response.data.setting.name;
+            sValu = response.data.setting.value;
+            if (callback) {
+                callback(sValu);
+            }
+        }
+    });
+}
+function getGlobalSetting(settingName, callback) {
+    var fn = spu.fi(arguments);
+    gql.EXEC(gql.getGlobalSetting(settingName), function(response) {
+
+        var setting = {};
+            setting.error = '';
+
+        if (response.errors) {
+            gql.handleError(fn+" gql.getGlobalSetting", response);
+            setting.error = '!!! ERROR retrieving Global Setting ['+settingName+']';
+            spu.consoleLog(setting.error);
+//            callback('ERROR');
+        } else {
+            spu.consoleLog('Retrieved Global Setting ['+settingName+']: '+response.data.setting.value);
+            
+            setting.name = response.data.setting.name;
+            setting.value = response.data.setting.value;
+            setting.value = (setting.value===null ? '' : setting.value);
+            globalSettings[setting.name] = setting.value;
+            
+        }
+        if (callback) {
+            callback(setting);
+        }
+    });
+}
+
+
+function workperiodCheck(wpid,callback) {
+    spu.consoleLog('Checking Workperiod Status...');
+    //getCustomReport(reportName,user,dateFilter,startDate,endDate,parameters,function currentWP(report) {
+//    var repUser = currentUser ? currentUser : defaultUser;
+    getCustomReport('Workperiod Status',currentUser,'','','','',function currentWP(report) {
+        WPID = report.tables[0].rows[0].cells[0];
+        WPisOpen = report.tables[0].rows[0].cells[1]=='YES' ? true : false;
+        spu.consoleLog('Last WPID:'+WPID+' open:'+WPisOpen);
+        workperiod.id = WPID;
+        workperiod.isOpen = WPisOpen;
+        $( '#workperiod' ).html('<span class="'+(workperiod.isOpen ? 'WP_Open' : 'WP_Closed')+'">' + workperiod.id + '</span>');
+        if (callback) {
+            callback(workperiod);
+        }
+    });
+}
+
+
+//////////////////////////////////////////////
+// 
+// TERMINAL
+//
+//////////////////////////////////////////////
+
+function isTerminalExists(terminalId,callback) {
+    var fn = spu.fi(arguments);
+    spu.consoleLog('TERMINAL Checking Exists ['+terminalId+'] ...');
+    
+    gql.EXEC(gql.getTerminalExists(terminalId), function t(response){
+        if (response.errors) {
+            gql.handleError(fn+' gql.getTerminalExists',response);
+        } else {
+            var exists = response.data.isTerminalExists;
+            var term = {};
+                term.exists = exists;
+                term.id = (exists ? terminalId : '');
+                term.name = clientSetting('terminalName');
+                term.department = clientSetting('terminalDepartment');
+                term.ticketType = clientSetting('terminalTicketType');
+                term.user = clientSetting('terminalUser');
+            //POS_Terminal.registered = term.exists;
+            
+            spu.consoleLog('TERMINAL Exists ['+terminalId+']: '+exists);
+            
+            if (callback) {
+                callback(term);
+            }
+        }
+    });
+}
+function registerTerminal(terminal,department,ticketType,user,reRegister,callback) {
+    var fn = spu.fi(arguments);
+    //terminal = terminal ? terminal : currentTerminal;
+    terminal = terminal ? terminal : defaultTerminal;
+    department = department ? department : departmentName;
+    ticketType = ticketType ? ticketType : ticketTypeName;
+    user = user ? user : currentUser;
+    reRegister = reRegister=='' ? false : true;
+    
+    spu.consoleLog('TERMINAL Registering (reReg='+reRegister+'): '+terminal);
+    
+    isTerminalExists(POS_Terminal.id,function e(data){
+        var term = {};
+            term.exists = data.exists;
+            term.id = data.id;
+        
+        POS_Terminal.registered = term.exists;
+
+        var alreadyRegistered = (POS_Terminal.registered && POS_Terminal.id==term.id && POS_Terminal.name==terminal ? true : false);
+
+        if (!POS_Terminal.registered || reRegister || POS_Terminal.name!=terminal) {
+            gql.EXEC(gql.registerTerminal(terminal,department,ticketType,user), function t(response){
+                if (response.errors) {
+                    gql.handleError(fn+" gql.registerTerminal", response);
+                    if (callback) {
+                        callback('ERROR');
+                    }
+                } else {
+                    POS_Terminal.id = response.data.terminalId;
+                    POS_Terminal.registered = (POS_Terminal.id!='' && POS_Terminal.id!=null ? true : false);
+                    if (POS_Terminal.registered) {
+                        POS_Terminal.name = terminal;
+                        POS_Terminal.department = department;
+                        POS_Terminal.ticketType = ticketType;
+                        POS_Terminal.user = user;
+                        clientSetting('terminalId',POS_Terminal.id,'set');
+                        clientSetting('terminalName',POS_Terminal.name,'set');
+                        clientSetting('terminalDepartment',POS_Terminal.department,'set');
+                        clientSetting('terminalTicketType',POS_Terminal.ticketType,'set');
+                        clientSetting('terminalUser',POS_Terminal.user,'set');
+                        spu.consoleLog('TERMINAL Registered ['+terminal+'] ('+POS_Terminal.registered+'): '+POS_Terminal.id);
+                    } else {
+                        clientSetting('terminalId','','del');
+                        clientSetting('terminalName','','del');
+                        clientSetting('terminalDepartment','','del');
+                        clientSetting('terminalTicketType','','del');
+                        clientSetting('terminalUser','','del');
+                        spu.consoleLog('TERMINAL NOT Registered ['+terminal+'] ('+POS_Terminal.registered+'): '+POS_Terminal.id);
+                    }
+
+                    $('#currentUser').html('['+POS_Terminal.name+'] '+currentUser);
+                    $('#currentUser').attr('title',currentTerminal+' ['+POS_Terminal.id+'] ('+currentUserRole+')');
+    
+                    if (module=='pos') {
+                        navigateTo('module','pos','pos');
+                    }
+                    
+                    if (callback) {
+                        callback(POS_Terminal);
+                    }
+                }
+            });
+        } else {
+            spu.consoleLog('TERMINAL Registered ['+terminal+'] (already registered): '+POS_Terminal.id);
+            clientSetting('terminalId',POS_Terminal.id,'set');
+            clientSetting('terminalName',POS_Terminal.name,'set');
+            POS_Terminal.department = clientSetting('terminalDepartment');
+            POS_Terminal.ticketType = clientSetting('terminalTicketType');
+            POS_Terminal.user = clientSetting('terminalUser');
+                        
+            $('#currentUser').html('['+POS_Terminal.name+'] '+currentUser);
+            $('#currentUser').attr('title',currentTerminal+' ['+POS_Terminal.id+'] ('+currentUserRole+')');
+            
+            if (callback) {
+                callback(POS_Terminal);
+            }
+        }
+
+    });
+}
+function unregisterTerminal(terminalId,callback) {
+    var fn = spu.fi(arguments);
+    terminalId = terminalId ? terminalId : POS_Terminal.id;
+    spu.consoleLog('TERMINAL Unregistering: '+terminalId);
+    
+    isTerminalExists(terminalId,function e(data){
+        var exists = data.exists;
+        
+        if (exists) {
+            gql.EXEC(gql.unregisterTerminal(terminalId), function t(response){
+                if (response.errors) {
+                    gql.handleError(fn+" gql.unregisterTerminal", response);
+                    if (callback) {
+                        callback('ERROR');
+                    }
+                } else {
+                    var unreg = response.data.isTerminalUnregistered;
+                    if (unreg) {
+                        POS_Terminal.registered = !unreg;
+                        POS_Terminal.id = '';
+                        POS_Terminal.name = '';
+                        POS_Terminal.department = '';
+                        POS_Terminal.ticketType = '';
+                        POS_Terminal.user = '';
+                        clientSetting('terminalId','','del');
+                        clientSetting('terminalName','','del');
+                        clientSetting('terminalDepartment','','del');
+                        clientSetting('terminalTicketType','','del');
+                        clientSetting('terminalUser','','del');
+                        spu.consoleLog('TERMINAL Unregister (success): '+terminalId);
+                    } else {
+                        spu.consoleLog('TERMINAL Unregister (fail), terminal not found: '+terminalId);
+                    }
+                    if (callback) {
+                        callback(unreg);
+                    }
+                }    
+            });
+        } else {
+            spu.consoleLog('TERMINAL Unregister (skipped), terminal not registered: '+terminalId);
+            if (callback) {
+                callback(false);
+            }
+        }
+        
+        $('#currentUser').html('['+POS_Terminal.name+'] '+currentUser);
+        $('#currentUser').attr('title',currentTerminal+' ['+POS_Terminal.id+'] ('+currentUserRole+')');
+    });
+    
 }

@@ -3,10 +3,22 @@
 // nav_reports
 //
 ////////////////////////////////
-function init_nav() {
-    // do some stuff
+spu.consoleLog('Loading Module JS for: '+module.replace(/_/,' ').toUpperCase()+' ...');
+
+function init_module() {
+    spu.consoleLog('Initializing Module JS for: '+module.replace(/_/,' ').toUpperCase()+' ...');
+    
+    if (customReports.length<1) {
+        $('#REP_Reports').html('<div class="info-message">Fetching Reports, please Wait...<br /><br />'+busyWheel+'</div>');
+        getReportVars('GQLM Custom Reports','', function rl(data){
+            customReports = data;
+            refreshReportDisplay();
+        });
+    } else {
+        refreshReportDisplay();
+    }
+    setReportFilterDefaults();
 }
-spu.consoleLog('Initializing '+module.replace(/_/,' ').toUpperCase()+' ...');
 
 var selectedTemplate = '';
 

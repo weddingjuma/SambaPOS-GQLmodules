@@ -5,6 +5,8 @@
 
 <meta name="description" content="SambaPOS Mobile Application ~ SambaPOS">
 
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <meta charset="utf-8" />
 <meta name="Keywords" content="flarfernugen">
 <meta name="GENERATOR" content="NOTEPAD">
@@ -43,16 +45,18 @@
     <div id="containerMaster">
         
         <div id="top">
-            <div id="module" onClick="navigateTo('module','main_menu','main_menu');" title="Click here for Main Menu">???</div>
-            <div id="indicators" onClick="chatShowFull();">
+            <div id="module" onClick="navigateTo('module','main_menu','main_menu');return false;" title="Click here for Main Menu">???</div>
+            <div id="indicators" onClick="chatShowFull();return false;">
                 <div id="connection" title="Connection Status: GREEN=Connected">...</div>
                 <div id="workperiod" title="Workperiod ID/Status: GREEN=Open">...</div>
                 <div id="battery" title="Battery Level">...</div>
-                <div id="MSG_messaging" title="Click here to go to Fullscreen Messaging." onClick="chatShowFull();"><div class="MSG_Indicator MSG_OldMessage">MSG</div></div>
+                <div id="MSG_messaging" title="Click here to go to Fullscreen Messaging." onClick="chatShowFull();return false;"><div class="MSG_Indicator MSG_OldMessage">MSG</div></div>
             </div>
-            <div id="currentUser" title="Current Terminal and User.  Click to Logout" onClick="logoutUser();">[Terminal] (User)</div>
-            <div id="signalRbytes" title="SignalR KB" onClick="clearTrafficBytes('signalr');">0.00</div>
-            <div id="GQLbytes" title="GraphQL KB sent/rcvd/TTL" onClick="clearTrafficBytes('gql');">0.00/0.00/0.00</div>
+            <div id="currentUser" title="Current Terminal and User.  Click to Logout" onClick="showTerminalInfo();return false;">[Terminal] (User)</div>
+            <div id="traffic">
+                <div id="signalRbytes" title="SignalR KB" onClick="clearTrafficBytes('signalr');return false;">0.00</div>
+                <div id="GQLbytes" title="GraphQL KB sent/rcvd/TTL" onClick="clearTrafficBytes('gql');return false;">0.00/0.00/0.00</div>
+            </div>
             <div id="clock_dateTime" title="Current Date/Time">
                 <span id="clock_date"></span>
                 <span id="clock_time">00:00:00 AM</span>
@@ -66,9 +70,34 @@
     </div><!-- #containerMaster -->
 
     <!-- hidden elements -->
-    <div id="entityGrids"></div>
-    <div id="infoMessage" title="click to close" style="display:none"></div>
+    <div id="POS_EntityGrids"></div>
+    <div id="POS_OrderTagDisplay" style="display:none">
+        <div id="POS_OrderTagsHeader"></div>
+        <div id="POS_OrderTags"></div>
+        <!-- <div id="POS_OrderTagScreenCommands"></div> -->
+        <div class="bottomShadow"></div>
+    </div>
     
+    <div id="infoMessage" title="click to close" style="display:none"></div>
+    <div id="loadMessage" style="display:none"></div>
+    <div id="errorMessage" style="display:none"></div>
+    <div id="warningMessage" style="display:none"></div>
+    <div id="helpMessage" style="display:none"></div>
+    
+    <div id="TERM_Info" style="display:none"></div>
+
+    <div id="inputDialog" style="display:none">
+        <div id="inputInfo"></div>
+        <div id="inputLabel"></div>
+        <div id="inputType"></div>
+        <div style="display:flex;">
+        <div id="inputGo" class="inputButton">OK</div>
+        <div id="inputClear" class="inputButton">CLEAR</div>
+        <div id="inputCancel" class="inputButton">CANCEL</div>
+        </div>
+    </div>
+
+
     <div id="USER_Auth" style="display:none">
         <div id="numpad">
             <input type="password" id="USER_inPIN" size="4" title="enter PIN and click GO">
@@ -85,22 +114,21 @@
             <div class="numpad-button" onclick="enterdigit('8','USER_inPIN')">8</div>
             <div class="numpad-button" onclick="enterdigit('9','USER_inPIN')">9</div>
             <br />
-            <div class="numpad-button" style="background-color:#660000;" onclick="enterdigit('back','USER_inPIN')">&lt;</div>
-            <div class="numpad-button" onclick="enterdigit('0','USER_inPIN')">0</div>
-            <div class="numpad-button" style="background-color:#000000;" onclick="enterdigit('clear','USER_inPIN')">X</div>
+            <div class="numpad-button" style="background-color:#660000;" onclick="enterdigit('back','USER_inPIN');return false;">&lt;</div>
+            <div class="numpad-button" onclick="enterdigit('0','USER_inPIN');return false;">0</div>
+            <div class="numpad-button" style="background-color:#000000;" onclick="enterdigit('clear','USER_inPIN');return false;">X</div>
             <br />
-            <div class="numpad-button" style="background-color:#006600;" onclick="spu.validateUser();">LOGIN</div>
+            <div class="numpad-button" style="background-color:#006600;" onclick="spu.validateUser();return false;">LOGIN</div>
         </div>
     </div>
     
-    <div id="errorMessage" style="display:none"></div>
-    <div id="helpMessage" style="display:none"></div>
+
     <div id="MSG_fullscreen" style="display:none">
         <div id="MSG_FS_area">
             <div id="MSG_FS_messages" title="Incoming and Outgoing Messages."></div><input id="MSG_FS_Input" name="MSG_FS_Input" type="text" placeholder="(type message)" title="Enter your Message here and hit ENTER or click SEND."/>
             <div id="MSG_FS_buttons">
-                <div id="MSG_FS_Send" title="Click here to send your Message." onclick="chatSendClick('MSG_FS');">SEND</div>
-                <div id="MSG_FS_close" title="Click here to close Fullscreen Messaging." onClick="chatShowFull('hide')">CLOSE</div>
+                <div id="MSG_FS_Send" title="Click here to send your Message." onclick="chatSendClick('MSG_FS');return false;">SEND</div>
+                <div id="MSG_FS_close" title="Click here to close Fullscreen Messaging." onClick="chatShowFull('hide');return false;">CLOSE</div>
             </div>
         </div>
     </div>

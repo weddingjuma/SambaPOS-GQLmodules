@@ -43,6 +43,9 @@ gql.EXEC = function (query, callback) {
                 spu.consoleLog('Uncaught Error: ['+jqXHR.status+']' + jqXHR.responseText);
                 showErrorMessage('Uncaught Error: ['+jqXHR.status+']' + "\r\n\r\n" + jqXHR.responseText);
             }
+            //callback(jqXHR.responseText);
+            jqXHR.responseJSON.GQLquery = data;
+            callback(jqXHR.responseJSON);
         }
     })
             .done(callback
@@ -54,6 +57,21 @@ gql.EXEC = function (query, callback) {
             );
 };
 
+
+gql.handleError = function(caller,errorData, callback) {
+    var errorMessage = errorData.errors[0].Message +' '+ errorData.errors[0].InnerException.Message;
+    spu.consoleLog("!!! GQL ERROR: ["+caller+'] '+ errorMessage + ' !!! ' + JSON.stringify(errorData));
+//    if (msg.indexOf('No ticket open on terminal')>-1) {
+//        $('#errorMessage').hide();
+//    } else {
+        var qry = errorData.GQLquery;
+        var e = caller+'<br /><br /><b>'+errorMessage+'</b><br /><br />'+qry;
+        showErrorMessage(e);
+        if (callback) {
+            callback(e);
+        }
+//    }
+};
 
 //----------------------------------------------------------------------------
 // GQL Authorization added in SambaPOS v5.1.61
@@ -67,10 +85,12 @@ gql.Authorize = function (user, password, callback) {
     spu.consoleLog('URL: '+aurl);
     spu.consoleLog('PW: '+password);
     
-    var rev = SambaPOS.split('.');
-    rev = Number(rev[2]);
+    var ver = SambaPOS.split('.');
+    var maj = Number(ver[0]);
+    var min = Number(ver[1]);
+    var rev = Number(ver[2]);
     
-    if (rev >= 61) {
+    if (maj>=5 && min>=1 && rev>=61) {
         
         jQuery.ajax({
         'type': 'POST',
@@ -81,7 +101,7 @@ gql.Authorize = function (user, password, callback) {
         })
         .done(function d(response){
             accessToken = response.access_token;
-            spu.consoleLog('AUTHORIZED GQL: ' + accessToken);
+            spu.consoleLog('AUTHORIZED GQL: ' + accessToken.substr(0,20) + ' ...');
             if (callback) {
                 callback(accessToken);
             }
@@ -89,7 +109,7 @@ gql.Authorize = function (user, password, callback) {
         
     } else {
         
-        spu.consoleLog('GQL AUTH requires v5.1.61+ ... bypassed.');
+        spu.consoleLog('GQL AUTH requires v5.1.61+ ... bypassed!');
         if (callback) {
             callback(accessToken);
         }
@@ -344,10 +364,6 @@ gql.postTaskRefreshMessage = function(taskIDs) {
     return q; //'mutation m {postTaskRefreshMessage(id:'+taskID+'){id}}';
 };
 
-gql.handleError = function(msg, errs) {
-    spu.consoleLog("!!! GQL ERROR: "+msg + ' !!! '+errs);
-};
-
 gql.getEntities = function(entityType, search, stateFilter){
     var q = '';
         q+= '{entities:getEntities(';
@@ -367,6 +383,21 @@ gql.getEntities = function(entityType, search, stateFilter){
 //    return '{entities:getEntities(type:"'+entityType+'"){type,name,states{stateName,state},customData{name,value}}}';
 };
 
+gql.getEntityScreenItems = function(entityScreen, stateFilter){
+    var q = '';
+        q+= '{entityScreenItems:getEntityScreenItems(';
+        q+= 'name:"'+entityScreen+'"';
+    if (stateFilter) {
+        q+= ', state:"'+stateFilter+'"';
+    }
+        q+= ')';
+        q+= '{';
+        q+= 'name,caption,color,labelColor';
+        q+= '}';
+        q+= '}';
+    return q;
+//    return '{entityScreenItems:getEntiyScreenItems(name:"Tables",state:"*"){name,caption,color,labelColor}}';
+};
 
 
 
@@ -387,15 +418,20 @@ gql.getMenuItems = function(category){
     return '{items:getMenuItems(menu:"Menu",category:"'+category+'"){id,name,header,caption,color,portion,product{groupCode,name,price,portions{name,price}}}}';
 };
 
-gql.getOrderTagGroups = function(menuItem,productId,portion){
-    return '{orderTagGroups:getOrderTagGroups(productName:"'+menuItem+'",productId:'+productId+',portion:"'+portion+'",ticketType:"'+ticketTypeName+'",terminal:"Server",department:"'+departmentName+'",user:"Q",hidden:false){id,name,color,min,max,tags{id,name,color,description,header,price,rate,filter}}}';
+gql.getOrderTagGroups = function(productName,productId,portion,ticketType,terminal,department,user,hidden){
+    portion = portion=='null' || portion=='' ? 'Normal' : portion;
+    return '{orderTagGroups:getOrderTagGroups(productName:"'+productName+'",productId:'+productId+',portion:"'+portion+'",ticketType:"'+ticketType+'",terminal:"'+terminal+'",department:"'+department+'",user:"'+user+'",hidden:'+hidden+'){id,name,color,min,max,hidden,tags{id,name,color,description,header,price,rate,filter,maxQuantity}}}';
 };
 
-gql.executePrintJob = function(printJobName, ticketId, orderStateFilters, nextOrderStates, nextTicketStates, copies, userName){
+gql.executePrintJob = function(printJobName, ticketId, copies, orderStateFilters, nextOrderStates, nextTicketStates, terminal, department, ticketType, userName, ticket){
     var pjName = (printJobName!='' ? printJobName : 'Print Bill');
     var tid = (ticketId ? ticketId : 0);
     var cpy = (copies ? copies:  1);
-    var usr = (userName ? userName : currentUser);
+    var usr = (userName ? userName:  currentUser);
+    terminal = (terminal ? terminal : POS_Terminal.name ? POS_Terminal.name : defaultTerminal);
+    department = (department ? department : departmentName);
+    ticketType = (ticketType ? ticketType : ticketTypeName);
+    ticket = (ticket ? ticket : '');
 
     if (orderStateFilters) {
     var osFilters = orderStateFilters.map(function (osf) {
@@ -414,7 +450,15 @@ gql.executePrintJob = function(printJobName, ticketId, orderStateFilters, nextOr
     }
     
     //return 'mutation m {executePrintJob(name:"'+pjName+'",ticketId:'+tid+',copies:'+copies+',orderStateFilters:{stateName:"sName",state:"st"},nextOrderStates:{stateName:"nsName",currentState:"csName",state:"nst"},nextTicketStates:{stateName:"sName",state:"st"},userName:"'+usr+'") {name}}';
-    var xpj = 'mutation m {executePrintJob(name:"'+pjName+'",ticketId:'+tid+',copies:'+cpy+',userName:"'+usr+'"';
+    var xpj = 'mutation m {printJob:executePrintJob(';
+    xpj+= 'name:"'+pjName+'"';
+    xpj+= ',ticketId:'+tid;
+    xpj+= ',copies:'+cpy;
+    xpj+= ',user:"'+usr+'"';
+    xpj+= ',terminal:"'+terminal+'"';
+    xpj+= ',department:"'+department+'"';
+    xpj+= ',ticketType:"'+ticketType+'"';
+    xpj+= (ticket!=='' ? ',ticket:"'+ticket+'"' : '');
         xpj+= (osFilters ? ',orderStateFilters:[' + osFilters.join() + ']' : '');
         xpj+= (osNext    ? ',nextOrderStates:[' + osNext.join() + ']' : '');
         xpj+= (tsNext    ? ',nextTicketStates:[' + tsNext.join() + ']' : '');
@@ -471,6 +515,125 @@ gql.updateEntityState = function(entityType,entityName,stateName,state) {
     return q;
 };
 
-gql.postTicketRefreshMessage = function(ticketId, callback) {
-    return 'mutation m{postTicketRefreshMessage(id:'+ticketId+'){id}}';
+gql.getProductPortions = function(productName,productId) {
+    return '{portions:getProductPortions(productName:"'+productName+'",productId:'+productId+'){id,name,productId,price}}';
+};
+
+gql.postTicketRefreshMessage = function(ticketId) {
+    return 'mutation m {postTicketRefreshMessage(id:'+ticketId+'){id}}';
+};
+
+gql.ticketDetails = function() {
+    return '{id,uid,type,number,date,totalAmount,remainingAmount,note,tags{tagName,tag},states{stateName,state},entities{name,type,id,typeId},orders{id,uid,name,productId,quantity,portion,price,priceTag,calculatePrice,decreaseInventory,increaseInventory,locked,states{stateName,state,stateValue},tags{tagName,tag,price,quantity,rate,userId}}}';
+};
+gql.updateTicket = function(ticketId,ticketTags,note) {
+    var q = 'mutation m {ticket:updateTicket(ticketId:'+ticketId;
+    q += ',ticketTags:' + (ticketTags ? ticketTags : '[]');
+    q += note!=='undefined' ? ',note:"'+note+'"' : '';
+    q += ')';
+    q += gql.ticketDetails();
+    q += '}';
+    return q;
+};
+gql.mergeTickets = function(terminal,department,ticketType,user,ticketIds) {
+    var q = 'mutation m {ticketId:mergeTickets(terminal:"'+terminal+'",department:"'+department+'",ticketType:"'+ticketType+'",user:"'+user+'"';
+    q += ',ticketIds:[' + ticketIds.join() + ']';
+    q += ')';
+//    q += '{}';
+    q += '}';
+    return q;
+};
+
+gql.registerTerminal = function(terminal,department,ticketType,user) {
+    //returns unique terminalId like: 7rO2ngxHRE2Rs47kHlBT8A
+    return 'mutation m {terminalId:registerTerminal(terminal:"'+terminal+'",department:"'+department+'",ticketType:"'+ticketType+'",user:"'+user+'")}';
+};
+gql.unregisterTerminal = function(terminalId) {
+    return 'mutation m {isTerminalUnregistered:unregisterTerminal(terminalId:"'+terminalId+'")}';
+};
+gql.getTerminalExists = function(terminalId) {
+    return '{isTerminalExists:getTerminalExists(terminalId:"'+terminalId+'")}';
+};
+
+gql.terminalTicketDetails = function() {
+    return '{id,uid,type,number,date,totalAmount,remainingAmount,note,entities{typeId,type,id,name},states{stateName,state},tags{tagName,tag},orders{id,uid,name,quantity,productId,portion,price,priceTag,calculatePrice,locked,decreaseInventory,increaseInventory,states{stateName,state,stateValue},tags{tagName,tag,quantity,price,rate,userId}}}';
+};
+gql.getTerminalTicket = function(terminalId) {
+    return '{terminalTicket:getTerminalTicket(terminalId:"'+terminalId+'")'+gql.terminalTicketDetails()+'}';
+};
+gql.getTerminalTickets = function(terminalId) {
+    return '{terminalTickets:getTerminalTickets(terminalId:"'+terminalId+'"){id,number,date,lastOrderDate,remaining,note,entities{typeId,type,id,name},tags{tagName,tag}}}';
+};
+gql.createTerminalTicket = function(terminalId) {
+    return 'mutation m {terminalTicket:createTerminalTicket(terminalId:"'+terminalId+'")'+gql.terminalTicketDetails()+'}';
+};
+gql.closeTerminalTicket = function(terminalId) {
+    return 'mutation m {closeTerminalTicket(terminalId:"'+terminalId+'")}';
+};
+gql.loadTerminalTicket = function(terminalId,ticketId) {
+    return 'mutation m {terminalTicket:loadTerminalTicket(terminalId:"'+terminalId+'",ticketId:"'+ticketId+'")'+gql.terminalTicketDetails()+'}';
+};
+gql.clearTerminalTicketOrders = function(terminalId) {
+    return 'mutation m {terminalTicket:clearTerminalTicketOrders(terminalId:"'+terminalId+'")'+gql.terminalTicketDetails()+'}';
+};
+gql.changeEntityOfTerminalTicket = function(terminalId,entityType,entityName) {
+    return 'mutation m {terminalTicket:changeEntityOfTerminalTicket(terminalId:"'+terminalId+'",type:"'+entityType+'",name:"'+entityName+'")'+gql.terminalTicketDetails()+'}';
+};
+gql.addOrderToTerminalTicket = function(terminalId,quantity,productName,portion,orderTags,productId) {
+    return 'mutation m {terminalTicket:addOrderToTerminalTicket(terminalId:"'+terminalId+'",productId:'+productId+',productName:"'+productName+'",quantity:'+quantity+',portion:"'+portion+'",orderTags:"'+orderTags+'")'+gql.terminalTicketDetails()+'}';
+};
+gql.updateOrderOfTerminalTicket = function(terminalId,orderUid,quantity,portion,price,priceTag,orderTags,name,calculatePrice,locked,warehouseName,increaseInventory,decreaseInventory,taxTemplate,accountTransactionType) {
+    var q = 'mutation m {terminalTicket:updateOrderOfTerminalTicket(';
+    q += 'terminalId:"' + terminalId + '"';
+    q += ',orderUid:"' + orderUid + '"';
+    q += quantity !== '' ? ',quantity:' + quantity : '';
+    q += portion !== '' ? ',portion:"' + portion+'"' : '';
+    q += price !== '' ? ',price:' + price : '';
+    q += priceTag !== '' ? ',priceTag:"' + priceTag+'"' : '';
+    q += calculatePrice !== '' ? ',calculatePrice:' + calculatePrice : '';
+    if (orderTags) {
+    var oTags = orderTags.map(function (oTag) {
+        return '{tagName:"' + oTag.tagName + '", tag:"' + oTag.tag + '"' + (oTag.price ? ', price:' + oTag.price : '') + (oTag.quantity ? ', quantity:' + oTag.quantity : '') + (oTag.rate ? ', rate:' + oTag.rate : '') + '}';
+    });
+    q+= (oTags ? ',orderTags:[' + oTags.join() + ']' : '');
+    }
+    q += locked !== '' ? ',locked:' + locked : '';
+    q += increaseInventory !== '' ? ',increaseInventory:' + increaseInventory : '';
+    q += decreaseInventory !== '' ? ',decreaseInventory:' + decreaseInventory : '';
+    q += name !== '' ? ',name:"' + name+'"' : '';
+    q += taxTemplate !== '' ? 'taxTemplate:"' + taxTemplate+'"' : '';
+    q += warehouseName !== '' ? 'warehouseName:"' + warehouseName+'"' : '';
+    q += accountTransactionType !== '' ? 'accountTransactionType:"' + accountTransactionType+'"' : '';
+    q += ')';
+    q += gql.terminalTicketDetails();
+    q += '}';
+    
+    return q;
+};
+gql.cancelOrderOnTerminalTicket = function(terminalId,orderUids) {
+    var q = 'mutation m {';
+    for (var u=0;u<orderUids.length;u++) {
+        q += 'm'+u+':';
+        q += 'cancelOrderOnTerminalTicket(terminalId:"'+terminalId+'",orderUid:"'+orderUids[u]+'")';
+        q += gql.terminalTicketDetails();
+        q += ((u+1) !== orderUids.length ? ', ' : '');
+    }
+    q += '}';
+    return q;
+//    return 'mutation m {terminalTicket:cancelOrderOnTerminalTicket(terminalId:"'+terminalId+'",orderUid:"'+orderUid+'")'+gql.terminalTicketDetails()+'}';
+};
+gql.getOrderTagsForTerminalTicketOrder = function(terminalId,orderUid) {
+    return 'mutation m {orderTagGroups:getOrderTagsForTerminalTicketOrder(terminalId:"'+terminalId+'",orderUid:"'+orderUid+'"){name,maxSelection,requiredSelection,tags{groupName,name,color,labelColor,isVisible,isSelected,fontSize,caption},categories{name,value,color,level,sortOrder},prefixes{name,color,fontSize}}}';
+};
+gql.executeAutomationCommandForTerminalTicket = function(terminalId,orderUid,commandName,commandValue) {
+    var q = 'mutation m {terminalTicket:executeAutomationCommandForTerminalTicket(';
+    q += 'terminalId:"'+terminalId+'"';
+    q += ',orderUid:"'+orderUid+'"';
+    q += ',name:"'+commandName+'"';
+    q += ',value:"'+commandValue+'"';
+    q += ')';
+    q += gql.terminalTicketDetails();
+    q += '}';
+    return q;
+    //'mutation m {terminalTicket:executeAutomationCommandForTerminalTicket(terminalId:"",orderUid:"",name:"",value:"")'+gql.terminalTicketDetails()+'}';
 };
