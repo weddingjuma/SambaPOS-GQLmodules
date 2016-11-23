@@ -1,6 +1,6 @@
 # SambaPOS-GQLmodules
 
-## GraphQL Modules for SambaPOS V5+
+## GraphQL Modules for SambaPOS V5.1.61+
 
 ### Javascript code to access GraphQL functionality in SambaPOS V5 from remote Browser Clients.
 
@@ -12,6 +12,7 @@ Runs in any ES5 compliant Browser.
  - Kitchen Display
  - Ticket Explorer
  - CHAT
+ - POS
  - Reports
  - Task Editor
  - Timeclock
