@@ -25,7 +25,7 @@ Runs in any ES5 compliant Browser.
 
 ### Additional Setup / Discussion (not issues)
 
- - https://forum.sambapos.com/t/sambapos-remote-client-gql-modules/
+ - https://forum.sambapos.com/t/gql-modules-graphql-modules-for-remote-client-browsers/
 
 ### Issues
 
