@@ -41,7 +41,7 @@ var msgsrv = webHost;
 
 // GraphQL server
 var GQLhost = msgsrv;
-var GQLport = '9898'; // generally, this is the only parameter that might need to change
+var GQLport = '9000'; // generally, this is the only parameter that might need to change
 var GQLpath = '/api/graphql/';
 var GQLurl  = webProto + '//' + GQLhost + ':' + GQLport + GQLpath;
 
