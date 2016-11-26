@@ -9,7 +9,7 @@ $driver = "{SQL Server Native Client 11.0}";
 $myUser = "sa";
 $myPass = "sambapos";
 $myServer= "localhost\SQLEXPRESS";
-$myDB= "SambaPOS5hh";
+$myDB= "SambaPOS5";
 $connection_string = "DRIVER={SQL Server};SERVER=$myServer;DATABASE=$myDB";
 
 //connection to MSSQL database
