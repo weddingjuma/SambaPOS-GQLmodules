@@ -39,6 +39,9 @@ var workperiod = {};
 var localSettings = { };
 var globalSettings = { };
 
+// Customer Display
+var CD_FeedbackTicketId = 0;
+
 // Kitchen Display
 var taskCount = 0;
 var selectedTasks = [];
@@ -85,6 +88,7 @@ var POS_TicketAreaContent = 'TicketList';
 var POS_OrderTagGroups = [];
 var POS_EntityTickets = [];
 var POS_SelectedTicketIds = [];
+var POS_SendKDUpdateMessage = false;
 var amcBtns_ticketCommands = [];
 var amcBtns_orderCommands = [];
 var amcBtns_ticketRow1 = [];

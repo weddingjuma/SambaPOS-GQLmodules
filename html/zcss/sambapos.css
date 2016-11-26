@@ -1174,16 +1174,35 @@ text-align: center;
     position: absolute;
     z-index: 5;
     right: 10px;
-    left: 10px;
-    /* box-shadow: 15px 6px 7px #221010; */
+    left: 10px; 
     /* flex-basis: 20%; */
-    height: 275px;
-    /*background-color: #000033;*/
+    height: 270px;
+    /*background-color: #333344;*/
     /* flex-grow: 1; */
+    box-shadow: 1px 6px 6px #221010;
+    border-color:#888888;
+    border-style: solid;
+    border-width: 1px;
 }
-#CD_orderContainer {
+#CD_watermark {
     position: absolute;
-    top: 275px;
+    bottom: 0px;
+    left: 0px;
+    right: 0px;
+    padding: 12px;
+    /* background-color: #FF3636; */
+    color: #333333;
+    font-weight: bold;
+    font-size: 34px;
+    text-align: center;
+    vertical-align: middle;
+    text-shadow: 1px 1px 0 #8C8C8C , -1px -1px 1px #000000;
+    text-shadow: 1px 1px 0 rgba(140,140,140,0.6) , -1px -1px 1px rgba(0,0,0,0.67);
+    z-index: 9;
+}
+#CD_orderContainer,#CD_feedback {
+    position: absolute;
+    top: 272px;
     left: 0px;
     right: 0px;
     bottom: 0px;
@@ -1196,14 +1215,14 @@ text-align: center;
     position: absolute;
     top: 0px;
     bottom: 10px;
-    right: 30px;
-    left: 40px;
+    right: 20px;
+    left: 20px;
     overflow-y: auto;
     background-color: #111133;
     /* width: 100%; */
-    margin-left: 10px;
-    /* padding-top: 270px; */
-    padding-right: 5px;
+    /* margin-left: 10px; */
+    padding-top: 10px;
+    /* padding-right: 5px; */
     padding-bottom: 10px;
     overflow-y: auto;
     /* z-index: -1; */
@@ -1214,11 +1233,16 @@ text-align: center;
     flex-direction:column;
     padding:5px;
     background-color:#111133;
+    color:#CCCCCC;
 }
-.CD_order:hover {
+.CD_orderNewest {
+    background-color:#070727;
+    color:#FFFFFF;
+}
+/*.CD_order:hover {
     background-color:#224455;
     cursor:pointer;
-}
+}*/
 .CD_orderLine {
     display:flex;
 }
@@ -1226,13 +1250,13 @@ text-align: center;
     display:inline-block;width:4%;min-width:4%;color:#FF9955;vertical-align:top;margin-right:10px;
 }
 .CD_orderName {
-    display:inline-block;width:55%;min-width:55%;color:#DDDDDD;vertical-align:top;text-align:left;
+    display:inline-block;width:55%;min-width:55%;vertical-align:top;text-align:left;
 }
 .CD_orderPrice {
     display:inline-block;width:20%;color:#88EEFF;vertical-align:top;text-align:right;white-space:nowrap;
 }
 .CD_orderPriceTotal {
-    display:inline-block;width:20%;color:#88EEFF;vertical-align:top;text-align:right;float:right;white-space:nowrap;
+    display:inline-block;width:20%;color:#88EEFF;vertical-align:top;text-align:right;float:right;white-space:nowrap;font-weight:bold;
 }
 .CD_FREE {
     color:#55FF55;
@@ -1258,7 +1282,10 @@ text-align: center;
     background-color: #003300;
 }
 #CD_ticketDiscounts {
-    /* width: 100%; */
+    position: absolute;
+    bottom: 0px;
+    left: 0px;
+    right: 0px;
     border-style: solid;
     border-width: 2px;
     border-color: #880088;
@@ -1266,6 +1293,7 @@ text-align: center;
     text-align: center;
     color: #FF88FF;
     background-color: #330033;
+    /*z-index:20;*/
 }
 #CD_ticketHeader {
     /* width: 100%; */
@@ -1278,16 +1306,18 @@ text-align: center;
     background-color: #000033;
 }
 #CD_idle {
+    position: absolute;
+    left: 0px;
+    right: 0px;
     margin: auto;
-    width: 90%;
-    border-style: solid;
-    border-width: 2px;
-    border-color: #AAAAAA;
+    /* width: 90%; */
     padding: 30px;
     text-align: center;
     color: #DDDDDD;
-    background-color: #333333;
+    background-color: #363636;
     vertical-align: middle;
+    height: 210px;
+    z-index: 10; 
 }
 .CD_venueName {
     color:#FFFFFF;
@@ -1296,20 +1326,54 @@ text-align: center;
 }
 .CD_paymentLine {
     display:flex;
+    justify-content: space-between;
 }
 .CD_paymentLabel {
-    text-align:left;
-    padding-right:20px;
-    width:50%;
+    /*text-align:left;*/
+    padding-right:5px;
+    /*width:50%;*/
 }
 .CD_paymentAmt {
-    text-align:right;
-    padding-left:20px;
-    width:50%;
+    /*text-align:right;*/
+    padding-left:5px;
+    /*width:50%;*/
 }
 .CD_paymentType {
     color:#FF55FF;
     font-size:14px;
+}
+#CD_feedback {
+    margin:auto;
+    text-align: center;
+    /*background-color: #00FF00;*/
+    color:#FFFFFF;
+    padding:30px;
+}
+#CD_feedbackQuestion {
+    font-size:32px;
+    font-weight:bold;
+}
+#CD_feedbackChoices {
+    display:flex;
+    margin-top:50px;
+}
+#CD_feedbackButtons {
+    display: flex;
+    width: 50%;
+    margin: auto;
+    justify-content: space-between;
+}
+#CD_feedbackButton_Positive {
+    font-weight:bold;
+}
+#CD_feedbackButton_Negative {
+    
+}
+#CD_feedbackButton_Neutral {
+    
+}
+#CD_feedbackButton_None {
+    
 }
 
 #KD_KitchenDisplay {

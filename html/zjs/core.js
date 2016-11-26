@@ -644,14 +644,29 @@ function HUB_handleEvent(ev) {
     switch (eventName) {
         case 'TICKET_DISPLAYED':
             if (module=='customer_display') {
+                var tid = ticketData ? ticketData.id : 0;
+                var ra  = ticketData ? ticketData.remainingAmount : 1;
+                var ta  = ticketData ? ticketData.totalAmount : 0;
                 CD_updateDisplay(ticketData);
+                if (CD_enableFeedback) {
+                    CD_showFeedbackScreen(tid,ra,ta);
+                    if (tid===0 || ra>0) {
+                        $('#CD_feedback').hide();
+                    }
+                }
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
             }
             break;
         case 'CLOSE_TICKET_NOW':
             if (module=='customer_display') {
-                CD_clearDisplay();
+                var tid = evData[0].ticketId;
+                var ra  = evData[0] ? evData[0].remainingAmount : 1;
+                var ta  = evData[0] ? evData[0].totalAmount : 0;
+                CD_clearDisplay(tid);
+                if (CD_enableFeedback) {
+                    CD_showFeedbackScreen(tid,ra,ta);
+                }
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
             }
@@ -659,6 +674,7 @@ function HUB_handleEvent(ev) {
         case 'CLOSE_TICKET_DELAYED':
             if (module=='customer_display') {
                 spu.consoleLog(eventName+'> '+'Calling: CD_clearDisplay_delayed ...');
+                var tid = evData[0].ticketId;
                 CD_clearDisplay_delayed();
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
@@ -666,7 +682,25 @@ function HUB_handleEvent(ev) {
             break;
         case 'PAYMENT_PROCESSED':
             if (module=='customer_display') {
+                var tid = ticketData ? ticketData.id : 0;
+                var ra  = ticketData ? ticketData.remainingAmount : 1;
+                var ta  = ticketData ? ticketData.totalAmount : 0;
                 CD_updateDisplay(ticketData);
+                if (CD_enableFeedback) {
+                    CD_showFeedbackScreen(tid,ra,ta);
+                }
+            } else {
+                spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
+            }
+            break;
+        case 'GET_FEEDBACK':
+            if (module=='customer_display') {
+                var tid = evData[0].ticketId;
+                var ra  = evData[0] ? evData[0].remainingAmount : 1;
+                var ta  = evData[0] ? evData[0].totalAmount : 0;
+                if (CD_enableFeedback) {
+                    CD_showFeedbackScreen(tid,ra,ta);
+                }
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
             }
@@ -761,14 +795,22 @@ function HUB_handleEvent(ev) {
                         spu.consoleLog('ticketId is 0, skipping POS_refreshTicketList.');
                     }
                 }
+            } else if (module=='customer_display') {
+                var tid = evData[0].ticketId;
+                var ra  = evData[0] ? evData[0].remainingAmount : 1;
+                var ta  = evData[0] ? evData[0].totalAmount : 0;
+                CD_clearDisplay(tid);
+                if (CD_enableFeedback) {
+                    CD_showFeedbackScreen(tid,ra,ta);
+                }
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
             }
             break;
         case 'TICKET_REFRESH':
             if (module=='pos') {
+                var tid = evData[0].eventData;
                 if (POS_TicketAreaContent=='Orders') {
-                    var tid = evData[0].eventData;
                     if (tid>0) {
                         spu.consoleLog(eventName+'> '+'Calling: POS_getTerminalTicket('+evData[0]['ticketId']+') ...');
                         POS_loadTerminalTicket(POS_Terminal.id,tid);
@@ -777,6 +819,11 @@ function HUB_handleEvent(ev) {
                         spu.consoleLog('ticketId is 0, skipping POS_getTerminalTicket.');
                     }
                 }
+                if (POS_TicketAreaContent=='TicketList') {
+                    spu.consoleLog(eventName+'> '+'Calling: POS_refreshTicketList('+evData[0]['ticketId']+') ...');
+                    POS_refreshTicketList();
+                }
+
             } else {
                 spu.consoleLog('[ NO ACTIONS FOR EVENT IN THIS CONTEXT ('+module+') ]');
             }
