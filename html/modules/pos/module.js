@@ -1,4 +1,4 @@
-/* global spu, POS_Terminal, module, POS_Menu */
+/* global spu, POS_Terminal, module, POS_Menu, busyWheel, currentUser */
 
 ////////////////////////////////
 //
@@ -144,6 +144,8 @@ function addOrderToTicket(terminalId,quantity,productName,portion,defaultOrderTa
         var orderUid = POS_Ticket.selectedOrder.uid;
         spu.consoleLog('Order Added: '+productName);
         
+//        POS_updateOrderStateList();
+        
 //        var oStates = POS_Ticket.selectedOrder.states;
 //        var oStateList = [];
 //        for (var s=0; s<oStates.length; s++) {
@@ -279,7 +281,24 @@ function POS_orderLineClicked(orderUid) {
     }
 
 }
-
+function POS_updateOrderStateList(selectedOrder) {
+    var fn = spu.fi(arguments);
+    
+    selectedOrder = typeof selectedOrder!=='undefined' ? selectedOrder : POS_Ticket.selectedOrder;
+    var oStates = selectedOrder.states;
+    var oStateList = [];
+//    POS_SendKDUpdateMessage = false;
+    for (var s=0; s<oStates.length; s++) {
+        var oStateName = oStates[s].stateName;
+        var oState = oStates[s].state;
+        oStateList.push(oState);
+        if (oStateName==='KDStatus' && oState==='FNotPrinted') {
+            POS_SendKDUpdateMessage = true;
+            spu.consoleLog('POS_updateOrderStateList found Order for KD Update ('+oStateName+'/'+oState+'): '+selectedOrder.name);
+        }
+    }
+//    POS_Ticket.selectedOrder.orderStateList = oStateList;
+}
 
 function POS_entityGridButtonClick(divId) {
     var fn = spu.fi(arguments);
@@ -877,6 +896,7 @@ function POS_showOrderTagScreenForOrder(orderTagGroups) {
         }
     }
 }
+
 /*
 function POS_showOrderTagScreen(orderTagGroups, orderTags) {
     var fn = spu.fi(arguments);
@@ -1727,6 +1747,14 @@ function POS_closeTerminalTicket(terminalId) {
 function POS_clearTerminalTicketData() {
     var fn = spu.fi(arguments);
     
+    spu.consoleLog('POS_clearTerminalTicketData sendKDmessage: '+POS_SendKDUpdateMessage);
+    if (POS_SendKDUpdateMessage) {
+        POS_SendKDUpdateMessage = false;
+        var productType = 'Food';
+        var msg = '{"eventName":"TASK_PRINTED","terminal":"'+POS_Terminal.name+'","userName":"'+currentUser+'","productType":"'+productType+'"}';
+        broadcastMessage(msg);
+    }
+    
 //    for (var e=0; e<POS_EntityTypes.length; e++) {
 //        var et = POS_EntityTypes[e];
 //        var ets = et.substr(0,POS_EntityTypes[e].length-1);
@@ -1739,6 +1767,7 @@ function POS_clearTerminalTicketData() {
     $('#POS_TicketTotalValue').html('0.00');
     POS_refreshTicketList();
     POS_fillEntityGrids();
+
 }
 
 function refreshTicket(ticketId, callback){
@@ -1762,6 +1791,8 @@ function POS_updateTicketOrder(ticketOrder, callback) {
         ticketOrder.requiredSelectionCount = 0;
 
         ticketOrder.selectionRequired = false;
+        
+        POS_updateOrderStateList(ticketOrder);
 
         if (!ticketOrder.locked) {
             POS_getOrderTagGroupsForOrder(POS_Terminal.id,orderUid, function co(oTagGroups){
@@ -1801,6 +1832,8 @@ function POS_updateTicketOrders(ticketOrders, showTicketOrders, callback){
     var ordersUpdated = [];
 
     if (orderCount>0) {
+        
+        POS_SendKDUpdateMessage = false;
         
         for (var i=0; i<orderCount; i++) {
             var order = ticketOrders[i];
@@ -2313,6 +2346,8 @@ function POS_refreshTicketList(ticketId) {
     var tid = typeof ticketId !== 'undefined' ? ticketId : 0;
     var fetchTickets = tid==0 ? true : false;
 
+    POS_SendKDUpdateMessage = false;
+    
     var timeOffset = getClientGMToffset().split(':');
     var offsetHours = Number(timeOffset[0]);
         offsetHours = offsetHours + Number(timeOffset[1])/60;

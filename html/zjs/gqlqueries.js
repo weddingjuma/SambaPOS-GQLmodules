@@ -162,6 +162,12 @@ gql.getTickets = function(startDate,endDate,isClosed,orderBy,take,skip) {
         q+= '}';
     return q;
 };
+gql.getTicket = function(ticketId) {
+    var q = '{ticket: getTicket(id:'+ticketId+')';
+        q+= '{id,uid,number,date,type,totalAmount,remainingAmount,states{stateName,state},tags{tagName,tag},entities{name,type,id,typeId},orders{id,uid,quantity,name,productId,portion,price,priceTag,calculatePrice,decreaseInventory,increaseInventory,tags{tagName,tag,price,quantity,rate,userId},states{stateName,state,stateValue}}}';
+        q+= '}';
+    return q;
+};
 gql.addTasks = function(taskTypes,taskNames,content,isCompleted,userName,customData,state) {
     var q = '';
         q+= 'mutation m{';
