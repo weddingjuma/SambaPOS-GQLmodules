@@ -15,8 +15,3 @@ var bypassIPs = [];          // if not Bypassing ALL Authentication, list the IP
     // if one of listed IPs are matched, then defaultUser will be used to Authenticate, UNLESS the user EXPLICITLY Logs Out.
     bypassIPs.push('::1'); // localhost IPv6
     bypassIPs.push('127.0.0.1'); // localhost IPv4
-    bypassIPs.push('192.168.1.190');
-    bypassIPs.push('192.168.0.4');
-    bypassIPs.push('192.168.0.5');
-    //bypassIPs.push('192.168.0.72');
-    bypassIPs.push('192.168.1.197');
